@@ -37,7 +37,7 @@ class ThreadSafeCmdIDManager:
         id_manager : CmdIDManager
             _description_
         """
-        self.id_manager_lock = threading.Lock() # setting the id_manager
+        self.id_manager_lock = threading.Lock() # setting the id_manager (locking the multiple threads)
         self.id_manager = id_manager if id_manager else CmdIDManager() # setting the id_manager else cmdID Manager.
 
 
@@ -114,22 +114,22 @@ class MairaKinematics(KinematicsInterface):
             Pass existing instance of neurapy.Robot, else a new instance is created
         """
         self._logger = init_logger(name=self.__class__.__name__)
-        self.speed_move_joint = speed_move_joint
-        self.speed_move_linear = speed_move_linear
-        self.rot_speed_move_linear = rot_speed_move_linear
-        self.acc_move_joint = acc_move_joint
-        self.acc_move_linear = acc_move_linear
-        self.rot_acc_move_linear = rot_acc_move_linear
-        self.blending_radius = blending_radius
-        self.require_elbow_up = require_elbow_up
+        self.speed_move_joint = speed_move_joint # setting up the speed move joint 
+        self.speed_move_linear = speed_move_linear # setting up the move linear 
+        self.rot_speed_move_linear = rot_speed_move_linear # setting up the rotation move linear  
+        self.acc_move_joint = acc_move_joint # setting up the acc move joint
+        self.acc_move_linear = acc_move_linear # setting up the acc move linear   
+        self.rot_acc_move_linear = rot_acc_move_linear # setting up the rotation acc move to linear
+        self.blending_radius = blending_radius # setting up the blending radius
+        self.require_elbow_up = require_elbow_up # setting up the reuire elbow up
         self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager) # setting the command ID Manager 
 
-        self._robot = Robot() if not robot_handler else robot_handler
-        self._robot_state = RobotStatus(self._robot)
-        self._program = Program(self._robot)
+        self._robot = Robot() if not robot_handler else robot_handler # setting up the robot handler
+        self._robot_state = RobotStatus(self._robot) # getting the robot status 
+        self._program = Program(self._robot) # setting up the program 
 
         self.num_joints = self._robot.dof
-        if require_elbow_up:
+        if require_elbow_up: # if the reuire elbow up is there:
             self._elbow_checker = ElbowChecker(
                 dof=self.num_joints, robot_name=self._robot.robot_name
             )
