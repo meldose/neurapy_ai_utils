@@ -136,7 +136,7 @@ class MairaKinematics(KinematicsInterface):
 
         self._database_client = DatabaseClient()
 
-###### Defining the fuction for changing the gripper #########
+###### Defining the function for changing the gripper #########
 
     def change_gripper_to(self, end_effector: EndEffector) -> None:
         """Choose gripper to control.
@@ -165,7 +165,7 @@ class MairaKinematics(KinematicsInterface):
             tool_name=end_effector.name, tool_params=tool_params
         )
 
-###  defining fucntion fot motion program ###
+###  defining function fot motion program ###
 
     def set_motion_param(
         self, speed_mj: float, speed_ml: float, acc_mj: float, acc_ml: float
@@ -187,10 +187,11 @@ class MairaKinematics(KinematicsInterface):
         """
         self.speed_move_joint = speed_mj
         self.speed_move_linear = speed_ml
+        
         self.acc_move_joint = acc_mj
         self.acc_move_linear = acc_ml
         
-### defining fucntion for wait ######
+### defining function for wait ######
 
 
     def wait(self, time_s: float) -> None:
@@ -333,7 +334,7 @@ class MairaKinematics(KinematicsInterface):
         return Pose(pose_quat[:3], pose_quat[-4:]).to_list()
 
 
- ######## fucntion to execute if succesful or not  ###############
+ ######## function to execute if succesful or not  ###############
  
     def _execute_if_successful(self, id: int) -> bool:
         """Execute trajectory for given id if successfull.
@@ -398,7 +399,7 @@ class MairaKinematics(KinematicsInterface):
         MairaKinematics._ID = 3e4
         self._program.finish()
 
-### defining fucntion for cartesian to joint ############
+### defining function for cartesian to joint ############
 
     def cartesian_2_joint(
         self,
