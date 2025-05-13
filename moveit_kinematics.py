@@ -40,7 +40,7 @@ class MoveitKinematics(KinematicsInterface):
         # init paramter for cartesian path trajectory retiming
         self.kwargs = {"algorithm": "iterative_time_parameterization"}
         
-##### defining the function for changing the gripper to ################
+##### defining the function for changing the gripper to control ################
 
     def change_gripper_to(self, end_effector: EndEffector) -> None:
         """Choose gripper to control.
@@ -51,7 +51,7 @@ class MoveitKinematics(KinematicsInterface):
             End effector parameters as saved on database.
         """
         # TODO set endeffector pose
-        self.group.set_endeffector(end_effector.name)
+        self.group.set_endeffector(end_effector.name) # setting the end effector 
         
 ######### defining the function for movement from joint to cartesian #############
 
@@ -91,12 +91,12 @@ class MoveitKinematics(KinematicsInterface):
             If action failed
         """
 
-        if not (speed is None):
-            self.group.set_max_velocity_scaling_factor(speed / 100)
+        if not (speed is None): # if the speed is not None
+            self.group.set_max_velocity_scaling_factor(speed / 100) # settign the max velocity scaling factor 
         if not (acc is None):
-            self.group.set_max_acceleration_scaling_factor(acc / 100)
+            self.group.set_max_acceleration_scaling_factor(acc / 100) # setting the max acceleration scaling factor 
 
-        if not isinstance(goal_pose, list):
+        if not isinstance(goal_pose, list): # checking if the goal_pose is in the list or not 
             raise TypeError("goal_pose must be of type list")
 
         try:
@@ -152,7 +152,7 @@ class MoveitKinematics(KinematicsInterface):
             Action failed
         """
 
-        if not (speed is None):
+        if not (speed is None): # checking if the speed is None 
             self.group.set_max_velocity_scaling_factor(speed / 100)
         if not (acc is None):
             self.group.set_max_velocity_scaling_factor(acc / 100)
