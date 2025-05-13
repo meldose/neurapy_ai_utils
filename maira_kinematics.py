@@ -57,7 +57,6 @@ class ThreadSafeCmdIDManager:
         self.id_manager_lock.release()
         return plan_id
 
-#### Defining an class for setting the Maira Kinematics ############
 
 class MairaKinematics(KinematicsInterface):
     """Access methods to plan and execute use the MAiRA control API.
