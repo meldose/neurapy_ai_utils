@@ -1137,6 +1137,7 @@ class MairaKinematics(KinematicsInterface):
                 plan_id
             )
         return (
+            
             success_flags,
             plan_id,
             last_joint_state,
@@ -1243,7 +1244,7 @@ class MairaKinematics(KinematicsInterface):
             last_joint_state,
         )
         
-## definig function for planning motion through points########
+## defining function for planning motion through points########
 
     def plan_motion_joint_via_points(
         self,
@@ -1324,7 +1325,7 @@ class MairaKinematics(KinematicsInterface):
             last_joint_state,
         )
 
-#### definig function for clearign the ids ############
+#### defining function for clearign the ids ############
 
     def clear_ids(self, ids: List[int]) -> bool: 
         """Clear given plan IDs from memory stack to prevent overload.
