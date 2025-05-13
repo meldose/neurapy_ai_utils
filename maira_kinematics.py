@@ -1,9 +1,9 @@
-import time
-from copy import deepcopy
-from typing import List, Optional, Tuple, Union
-import threading
+import time # imoporting time module 
+from copy import deepcopy # importing copy module
+from typing import List, Optional, Tuple, Union # from typing import list, optional , Tuple and Union modules
+import threading #importing threading module 
 
-import numpy as np
+import numpy as np # importing numpy modules
 from neura_apps.gui_program.program import Program
 from neurapy.commands.state.robot_status import RobotStatus
 from neurapy.component import Component
@@ -13,7 +13,7 @@ from neurapy.utils import CmdIDManager
 from neurapy_ai.clients.database_client import DatabaseClient
 from neurapy_ai.utils.types import Pose, EndEffector
 from neurapy_ai_utils.functions.utils import init_logger
-from omniORB import CORBA
+from omniORB import CORBA # importing CORBA modules
 
 from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
@@ -37,8 +37,8 @@ class ThreadSafeCmdIDManager:
         id_manager : CmdIDManager
             _description_
         """
-        self.id_manager_lock = threading.Lock()
-        self.id_manager = id_manager if id_manager else CmdIDManager()
+        self.id_manager_lock = threading.Lock() # setting the id_manager
+        self.id_manager = id_manager if id_manager else CmdIDManager() # setting the id_manager else cmdID Manager.
 
 
 # defining the function for updating the id ###########
@@ -51,11 +51,11 @@ class ThreadSafeCmdIDManager:
         int
             Recently updated command id
         """
-        self.id_manager_lock.acquire()
-        self.id_manager.update_id()
-        plan_id = self.id_manager.get_id()
-        self.id_manager_lock.release()
-        return plan_id
+        self.id_manager_lock.acquire() #  multiple threading program, lock prevent sone thread at a time 
+        self.id_manager.update_id() # id mnageer objects updates its ID counter
+        plan_id = self.id_manager.get_id() # gets the latest id 
+        self.id_manager_lock.release() # releaes the lock allows other threads 
+        return plan_id # return the plan_id or get the latest id
 
 
 class MairaKinematics(KinematicsInterface):
@@ -70,16 +70,16 @@ class MairaKinematics(KinematicsInterface):
  
     def __init__(
         self,
-        speed_move_joint: int = 20,
-        speed_move_linear: float = 0.1,
-        rot_speed_move_linear: float = 0.87266463,
-        acc_move_joint: int = 20,
-        acc_move_linear: float = 0.1,
-        rot_acc_move_linear: float = 1.74532925,
-        blending_radius: float = 0.005,
-        require_elbow_up: bool = True,
-        id_manager: CmdIDManager = None,
-        robot_handler: Robot = None,
+        speed_move_joint: int = 20, # setting the move joint
+        speed_move_linear: float = 0.1,# setting the move linear
+        rot_speed_move_linear: float = 0.87266463, # setting the rotational speed move linear
+        acc_move_joint: int = 20, # setting the accelearion move joint 
+        acc_move_linear: float = 0.1,# setting the acc of move linear 
+        rot_acc_move_linear: float = 1.74532925,# setting the rotational acc move linear
+        blending_radius: float = 0.005,# setting the blending radius
+        require_elbow_up: bool = True,# setting the reuire elbow up
+        id_manager: CmdIDManager = None, # setting the id manager
+        robot_handler: Robot = None, # setting the robot handler 
     ):
         """Provide wrapped function for robot motion.
 
@@ -122,7 +122,7 @@ class MairaKinematics(KinematicsInterface):
         self.rot_acc_move_linear = rot_acc_move_linear
         self.blending_radius = blending_radius
         self.require_elbow_up = require_elbow_up
-        self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager)
+        self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager) # setting the command ID Manager 
 
         self._robot = Robot() if not robot_handler else robot_handler
         self._robot_state = RobotStatus(self._robot)
@@ -134,7 +134,7 @@ class MairaKinematics(KinematicsInterface):
                 dof=self.num_joints, robot_name=self._robot.robot_name
             )
 
-        self._database_client = DatabaseClient()
+        self._database_client = DatabaseClient() # setting the database client 
 
 ###### Defining the function for changing the gripper #########
 
@@ -246,7 +246,7 @@ class MairaKinematics(KinematicsInterface):
             joint_states = list(joint_states)
 
         if not (
-            (isinstance(joint_states, list)) # if in the list , checking if the lenght of the joint states are eual to the number of joint
+            (isinstance(joint_states, list)) # if joint states is in the list , checking if the lenght of the joint states are eual to the number of joint
             and len(joint_states) == self.num_joints
         ):
             raise TypeError(
@@ -399,8 +399,8 @@ class MairaKinematics(KinematicsInterface):
     def finish(self) -> None:
         """Delete planned motion buffer from NeuraPy. Only call this when
         program is going to be stopped."""
-        MairaKinematics._ID = 3e4
-        self._program.finish()
+        MairaKinematics._ID = 3e4 # setting the MairaKinematics class to 30000.0
+        self._program.finish() # stop the execution and disengage the robot controller
 
 ### defining function for cartesian to joint ############
 
@@ -434,16 +434,16 @@ class MairaKinematics(KinematicsInterface):
 
         """
         if not isinstance(goal_pose_cartesian, list): # checking if the goal pose cartesian is in the list or not 
-            raise TypeError("cartesian_pose must be of type list")
+            raise TypeError("cartesian_pose must be of type list") # raise the type of error 
 
         self._throw_if_pose_invalid(goal_pose_cartesian) 
 
         reference_joint_states = (
-            self._get_current_joint_state()
-            if reference_joint_states is None
+            self._get_current_joint_state() # getting the current joint states
+            if reference_joint_states is None # if the reference joint states is None 
             else reference_joint_states
         ) # setting the current joint states
-        if not self.require_elbow_up:
+        if not self.require_elbow_up: # if it is not elbow up
             return self._get_ik_solution(
                 goal_pose_cartesian=goal_pose_cartesian,
                 reference_joint_states=reference_joint_states,
@@ -482,7 +482,7 @@ class MairaKinematics(KinematicsInterface):
             IK solver failed
 
         """
-        solution = []
+        solution = [] # creating and empty list of solution
         for i in range(100):
             np.random.seed(i)
             dummy_array = (
@@ -491,8 +491,8 @@ class MairaKinematics(KinematicsInterface):
             try:
                 solution = self._robot.ik_fk(
                     "ik",
-                    target_pose=goal_pose_cartesian,
-                    current_joint=dummy_array,
+                    target_pose=goal_pose_cartesian, # setting the target pose 
+                    current_joint=dummy_array,# setting the current joint
                 )
             except Exception as e:
                 self._logger.debug(e)
@@ -501,7 +501,7 @@ class MairaKinematics(KinematicsInterface):
             if not np.any(np.isnan(solution)):
                 return solution
         else:
-            raise ValueError(f"IK solution return nan.")
+            raise ValueError(f"IK solution return nan.") # raise an Value Error
 
 
  ###########function foir getting the elbow up ik solution ###############
@@ -540,12 +540,12 @@ class MairaKinematics(KinematicsInterface):
         for retry_delta_angle_state in retry_delta_angle_states:
             seed_joint = deepcopy(reference_joint_states)
             seed_joint[5] = (
-                reference_joint_states[5] + retry_delta_angle_state[0]
+                reference_joint_states[5] + retry_delta_angle_state[0] # seed joint [5] is updated with respect to reference jont states and and retry delta angle state
                 if reference_joint_states[5] < 0.0
                 else reference_joint_states[5] - retry_delta_angle_state[0]
             )
             seed_joint[6] = (
-                reference_joint_states[6] + retry_delta_angle_state[1]
+                reference_joint_states[6] + retry_delta_angle_state[1] # seed joint [6] is updated with respect to reference jont states and and retry delta angle state
                 if reference_joint_states[6] < 0.0
                 else reference_joint_states[6] - retry_delta_angle_state[1]
             )
@@ -561,7 +561,7 @@ class MairaKinematics(KinematicsInterface):
                 pass
         else:
             self._logger.debug("Elbow down!")
-            raise ValueError("Could not find elbow up solution")
+            raise ValueError("Could not find elbow up solution") # raise the Value Error 
 
 
 ###### defining the function for motion till force ##########
@@ -739,13 +739,13 @@ class MairaKinematics(KinematicsInterface):
         self._throw_if_pose_invalid(goal_pose)
 
         linear_property = {
-            "target_pose": [self._get_current_cartesian_pose(), goal_pose],
-            "speed": self.speed_move_linear if speed is None else speed,
-            "acceleration": self.acc_move_linear if acc is None else acc,
-            "blending": False,
-            "blend_radius": 0.0,
+            "target_pose": [self._get_current_cartesian_pose(), goal_pose], # setting the target pose
+            "speed": self.speed_move_linear if speed is None else speed, # setting the speed
+            "acceleration": self.acc_move_linear if acc is None else acc, # setting the acceleration
+            "blending": False, # setting the blending 
+            "blend_radius": 0.0, # setting the blend radius
         }
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # updating the id value 
         self._program.set_command(
             cmd.Linear,
             **linear_property,
@@ -805,14 +805,14 @@ class MairaKinematics(KinematicsInterface):
 
         goal_poses.insert(0, self._get_current_cartesian_pose())
         linear_property = {
-            "target_pose": goal_poses,
-            "speed": self.speed_move_linear if speed is None else speed,
-            "acceleration": self.acc_move_linear if acc is None else acc,
+            "target_pose": goal_poses, # setting up the target poses
+            "speed": self.speed_move_linear if speed is None else speed, # setting the speed
+            "acceleration": self.acc_move_linear if acc is None else acc, # setting the acceleration
             "blend_radius": (
-                0.01 if (blending_radius is None) else blending_radius
+                0.01 if (blending_radius is None) else blending_radius # defining the blend radius
             ),
         }
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # updating the id 
         self._program.set_command(
             cmd.Linear,
             **linear_property,
@@ -860,16 +860,16 @@ class MairaKinematics(KinematicsInterface):
         RuntimeError
             Action failed
         """
-        self._throw_if_trajectory_invalid(trajectory)
+        self._throw_if_trajectory_invalid(trajectory) 
 
         joint_property = {
-            "target_joint": trajectory,
-            "speed": self.speed_move_joint if speed is None else speed,
-            "acceleration": self.acc_move_joint if acc is None else acc,
-            "interpolator": 1,
-            "enable_blending": True,
+            "target_joint": trajectory, # setting the target point
+            "speed": self.speed_move_joint if speed is None else speed,# setting the speed
+            "acceleration": self.acc_move_joint if acc is None else acc,# setting the accelration
+            "interpolator": 1,# setting the interpolator
+            "enable_blending": True,# setting the enable blending 
         }
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # setting up the plan_id 
         self._program.set_command(
             cmd.Joint,
             **joint_property,
@@ -907,14 +907,16 @@ class MairaKinematics(KinematicsInterface):
         self._logger.info(f"Executable ids: {executable_ids}")
         self._program.execute(executable_ids)
 
+###### defining the function for motion plan to cartesian ############
+
     def plan_motion_joint_to_cartesian(
         self,
         goal_pose,
-        reference_joint_states: Union[List[float], None] = None,
-        start_joint_states: Union[List[float], None] = None,
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-        reusable: Optional[bool] = False,
+        reference_joint_states: Union[List[float], None] = None, # setting the reference joint states
+        start_joint_states: Union[List[float], None] = None, # setting the joint states
+        speed: Optional[int] = None,  # defining the speed
+        acc: Optional[int] = None, # defining the acc
+        reusable: Optional[bool] = False, # defining the reusable 
     ) -> Tuple[bool, int, List[float]]:
         """Plan motion for move joint action with given goal, speed and acceleration
 
@@ -958,31 +960,31 @@ class MairaKinematics(KinematicsInterface):
         self._throw_if_pose_invalid(goal_pose)
         self._throw_if_joint_invalid(start_joint_states)
 
-        try:
+        try:  
             joint_pose = self.cartesian_2_joint(
                 goal_pose, reference_joint_states
             )
-        except ValueError as e:
+        except ValueError as e: # raise and except value Error 
             self._logger.error(e)
             return False, None, []
 
-        return self.plan_motion_joint_to_joint(
+        return self.plan_motion_joint_to_joint( 
             goal_pose=joint_pose,
             start_joint_states=start_joint_states,
             speed=speed,
             acc=acc,
             reusable=reusable,
-        )
+        ) # returning the function
         
 ### defining function for plan motion from joint to joint ######
 
     def plan_motion_joint_to_joint(
         self,
-        goal_pose: List[float],
-        start_joint_states: Union[List[float], None] = None,
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-        reusable: Optional[bool] = False,
+        goal_pose: List[float], # setting up the goal pose 
+        start_joint_states: Union[List[float], None] = None, # setting up the start join states 
+        speed: Optional[int] = None, # setting up the speed
+        acc: Optional[int] = None, # setting up the acc
+        reusable: Optional[bool] = False, # setting up the reusable 
     ) -> Tuple[Tuple[bool, bool], int, List[float]]:
         """Plan motion for move joint action with given goal, speed and
         acceleration.
@@ -1025,8 +1027,8 @@ class MairaKinematics(KinematicsInterface):
         self._throw_if_joint_invalid(goal_pose) 
         self._throw_if_joint_invalid(start_joint_states)
 
-        if start_joint_states is None:
-            start_joint_states = self._get_current_joint_state()
+        if start_joint_states is None: # if the stat joint states is None then 
+            start_joint_states = self._get_current_joint_state() # getting the current joint states 
 
         joint_property = {
             "target_joint": [goal_pose],
@@ -1034,9 +1036,9 @@ class MairaKinematics(KinematicsInterface):
             "acceleration": self.acc_move_joint if acc is None else acc,
             "interpolator": 1,
             "enable_blending": True,
-        }
+        } # defining the join propert dictionary
 
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # update the id 
         self._program.set_command(
             cmd.Joint,
             **joint_property,
@@ -1044,29 +1046,29 @@ class MairaKinematics(KinematicsInterface):
             current_joint_angles=start_joint_states,
             reusable_id=1 if reusable else 0,
         )
-        success_flags = self._is_id_successful(plan_id)
+        success_flags = self._is_id_successful(plan_id) # setting the success flage for checking if the lates id is successful or not 
         last_joint_state = None
-        if all(success_flags):
+        if all(success_flags): # if the all the success flags are there then
             last_joint_state = self._program.get_last_joint_configuration(
                 plan_id
-            )
+            ) # setting the last joint state
         return (
             success_flags,
             plan_id,
             last_joint_state,
-        )
+        ) # returning the success flags, plan_id and last joint state
 
 
 #### defining function for moiton linear #######
 
     def plan_motion_linear(
         self,
-        goal_pose: List[float],
-        start_cartesian_pose: Union[List[float], None] = None,
-        start_joint_states: Union[List[float], None] = None,
-        speed: Optional[float] = None,
-        acc: Optional[float] = None,
-        reusable: Optional[bool] = False,
+        goal_pose: List[float], # setting up the goal pose 
+        start_cartesian_pose: Union[List[float], None] = None, # setting up the cartesian pose  
+        start_joint_states: Union[List[float], None] = None, # setting up the  start joint states 
+        speed: Optional[float] = None, # setting up the speed
+        acc: Optional[float] = None, # setting up the acc
+        reusable: Optional[bool] = False, # setting up the reusable    
     ) -> Tuple[Tuple[bool, bool], int, List[float]]:
         """Plan motion for move linear action with given goal, speed and
         acceleration.
@@ -1113,18 +1115,18 @@ class MairaKinematics(KinematicsInterface):
             start_cartesian_pose = self._get_current_cartesian_pose() # getting the current cartesian pose 
             start_joint_states = self._get_current_joint_state() # getting the curretn joint state
 
-        self._throw_if_pose_invalid(goal_pose) 
-        self._throw_if_pose_invalid(start_cartesian_pose)
-        self._throw_if_joint_invalid(start_joint_states)
+        self._throw_if_pose_invalid(goal_pose) # checking if the goal pose is valid or not 
+        self._throw_if_pose_invalid(start_cartesian_pose) # checking if the cartesian pose  is valid or not 
+        self._throw_if_joint_invalid(start_joint_states)# checking if the  is joint states is  valid or not 
 
         linear_property = {
-            "target_pose": [start_cartesian_pose, goal_pose],
-            "speed": self.speed_move_linear if speed is None else speed,
-            "acceleration": self.acc_move_linear if acc is None else acc,
-            "blending": False,
-            "blend_radius": 0.0,
+            "target_pose": [start_cartesian_pose, goal_pose],# setting up the target pose
+            "speed": self.speed_move_linear if speed is None else speed,# setting up the speed
+            "acceleration": self.acc_move_linear if acc is None else acc,# setting up the acceleration
+            "blending": False,# setting up the blending 
+            "blend_radius": 0.0, # setting up the blend radius 
         }
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # updating the plan id 
         self._program.set_command(
             cmd.Linear,
             **linear_property,
@@ -1132,8 +1134,8 @@ class MairaKinematics(KinematicsInterface):
             current_joint_angles=start_joint_states,
             reusable_id=1 if reusable else 0,
         )
-        success_flags = self._is_id_successful(plan_id)
-        last_joint_state = None
+        success_flags = self._is_id_successful(plan_id) # setting up the success flags 
+        last_joint_state = None # setting up  the latest joint states as None
         if all(success_flags):
             last_joint_state = self._program.get_last_joint_configuration(
                 plan_id
@@ -1212,9 +1214,9 @@ class MairaKinematics(KinematicsInterface):
             start_cartesian_pose = self._get_current_cartesian_pose() # getting the current the cartesian poses
             start_joint_states = self._get_current_joint_state() # getting the current joint state 
 
-        self._throw_if_list_poses_invalid(goal_poses)
-        self._throw_if_pose_invalid(start_cartesian_pose)
-        self._throw_if_joint_invalid(start_joint_states)
+        self._throw_if_list_poses_invalid(goal_poses) # checking if the goal pose is valid or not 
+        self._throw_if_pose_invalid(start_cartesian_pose)  # checking if the cartesian pose  is valid or not 
+        self._throw_if_joint_invalid(start_joint_states) # checking if the  is joint states is  valid or not 
 
         goal_poses.insert(0, self._get_current_cartesian_pose())
         linear_property = {
@@ -1226,7 +1228,7 @@ class MairaKinematics(KinematicsInterface):
             ),
         }
 
-        plan_id = self._id_manager.update_id()
+        plan_id = self._id_manager.update_id() # setting up the plan_id 
         self._program.set_command(
             cmd.Linear,
             **linear_property,
@@ -1234,7 +1236,7 @@ class MairaKinematics(KinematicsInterface):
             current_joint_angles=start_joint_states,
             reusable_id=1 if reusable else 0,
         )
-        success_flags = self._is_id_successful(plan_id)
+        success_flags = self._is_id_successful(plan_id) # setting up the success flags # 
         last_joint_state = None
         if all(success_flags):
             last_joint_state = self._program.get_last_joint_configuration(
@@ -1250,11 +1252,11 @@ class MairaKinematics(KinematicsInterface):
 
     def plan_motion_joint_via_points(
         self,
-        trajectory: List[List[float]],
-        start_joint_states: Union[List[float], None] = None,
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-        reusable: Optional[bool] = False,
+        trajectory: List[List[float]], # setting up the trajectory 
+        start_joint_states: Union[List[float], None] = None, # setting up the joint states 
+        speed: Optional[int] = None, # setting up the speed
+        acc: Optional[int] = None, # setting up the acc
+        reusable: Optional[bool] = False, # setting up the reusable 
     ) -> Tuple[Tuple[bool, bool], int, List[float]]:
         """
         Plan motion for move joint via points action with given joint
@@ -1297,8 +1299,8 @@ class MairaKinematics(KinematicsInterface):
         if start_joint_states is None: # if the start joint state is None 
             start_joint_states = self._get_current_joint_state() # getting the current joint state
 
-        self._throw_if_trajectory_invalid(trajectory)
-        self._throw_if_joint_invalid(start_joint_states)
+        self._throw_if_trajectory_invalid(trajectory) # checking if the trajectory is valid or not 
+        self._throw_if_joint_invalid(start_joint_states)# checking if the joint states is valid or not 
 
         joint_property = {
             "target_joint": trajectory,
@@ -1306,8 +1308,8 @@ class MairaKinematics(KinematicsInterface):
             "acceleration": self.acc_move_joint if acc is None else acc,
             "interpolator": 1,
             "enable_blending": True,
-        }
-        plan_id = self._id_manager.update_id()
+        } # creating an dictionary for joint property
+        plan_id = self._id_manager.update_id() # updating the plan id 
         self._program.set_command(
             cmd.Joint,
             **joint_property,
@@ -1315,9 +1317,9 @@ class MairaKinematics(KinematicsInterface):
             current_joint_angles=start_joint_states,
             reusable_id=1 if reusable else 0,
         )
-        success_flags = self._is_id_successful(plan_id)
+        success_flags = self._is_id_successful(plan_id) # setting up the success flags
         last_joint_state = None
-        if all(success_flags):
+        if all(success_flags): # setting up the success flags
             last_joint_state = self._program.get_last_joint_configuration(
                 plan_id
             )
@@ -1325,7 +1327,7 @@ class MairaKinematics(KinematicsInterface):
             success_flags,
             plan_id,
             last_joint_state,
-        )
+        ) # returning the success flags, plan_id , latest joint states 
 
 #### defining function for clearign the ids ############
 
@@ -1343,14 +1345,14 @@ class MairaKinematics(KinematicsInterface):
             Clearing success
 
         """
-        rts = Component(self._robot, "RTS")
+        rts = Component(self._robot, "RTS") # setting up the RTS component
         corba_cmd_id = CORBA.Any(
             CORBA.TypeCode("IDL:omg.org/CORBA/DoubleSeq:1.0"), ids
         )
         success = rts.callService("clearSplineId", [corba_cmd_id]) == 0 # setting the success rate 
         if not success: # if not success raise the error 
             self._logger.warning(f"Fail to delete ids {ids}")
-        return success
+        return success # returning the success
     
 #### defining the function for checking the id is succesfull or not #############
 
@@ -1385,7 +1387,7 @@ class MairaKinematics(KinematicsInterface):
                 and status != calculation.Success # if the status si not success
                 and (time.time() - t_start) < timeout # checking if the time is less than the actual timeout 
             ):
-                time.sleep(0.01)
+                time.sleep(0.01) # setting up the time sleep
                 status = self._program.get_plan_status(plan_id)
             if status == calculation.Success: # if the status is sucess
                 return True, True # return True 
