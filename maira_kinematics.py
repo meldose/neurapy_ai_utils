@@ -18,7 +18,7 @@ from omniORB import CORBA
 from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 
-#### Defining the class ThreadSafeCMdIDManager ######
+
 
 class ThreadSafeCmdIDManager:
     """Thread safe implementation of CmdIDManager. This class has a thread lock
