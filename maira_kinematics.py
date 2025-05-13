@@ -368,6 +368,8 @@ class MairaKinematics(KinematicsInterface):
                 {self._get_current_joint_state()}"
         )
         return plan_success # return the plan_success
+    
+##### defining function for getting the current joint state ###########
 
     def get_current_joint_state(self) -> List[float]:
         """Get the current joint state as a list of floats
