@@ -52,7 +52,7 @@ class ThreadSafeCmdIDManager:
             Recently updated command id
         """
         self.id_manager_lock.acquire() #  multiple threading program, lock prevent sone thread at a time 
-        self.id_manager.update_id() # id mnageer objects updates its ID counter
+        self.id_manager.update_id() # id manager objects updates its ID counter
         plan_id = self.id_manager.get_id() # gets the latest id 
         self.id_manager_lock.release() # releaes the lock allows other threads 
         return plan_id # return the plan_id or get the latest id
