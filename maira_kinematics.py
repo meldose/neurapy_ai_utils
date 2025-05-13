@@ -18,12 +18,15 @@ from omniORB import CORBA
 from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 
+#### Defining the class ThreadSafeCMdIDManager ######
+
 class ThreadSafeCmdIDManager:
     """Thread safe implementation of CmdIDManager. This class has a thread lock
     that ensures that only one process updates and read the ID at a time by
     returning the updated id immediately on update, during which the update
     method is locked.
     """
+## initialise the elements ############
 
     def __init__(self, id_manager: CmdIDManager = None):
         """Initialise optionally with an existing id manager
@@ -36,6 +39,9 @@ class ThreadSafeCmdIDManager:
         """
         self.id_manager_lock = threading.Lock()
         self.id_manager = id_manager if id_manager else CmdIDManager()
+
+
+# defining the function for updating the id ###########
 
     def update_id(self) -> int:
         """Update the command id by incrementing and return the updated id.
@@ -51,6 +57,7 @@ class ThreadSafeCmdIDManager:
         self.id_manager_lock.release()
         return plan_id
 
+#### Defining an class for setting the Maira Kinematics ############
 
 class MairaKinematics(KinematicsInterface):
     """Access methods to plan and execute use the MAiRA control API.
@@ -60,7 +67,8 @@ class MairaKinematics(KinematicsInterface):
     KinematicsInterface : ABC
         Interface with kinematic methods to define.
     """
-
+ #### intialise the elements ############
+ 
     def __init__(
         self,
         speed_move_joint: int = 20,
@@ -129,6 +137,8 @@ class MairaKinematics(KinematicsInterface):
 
         self._database_client = DatabaseClient()
 
+###### Defining the fuction for changing the gripper #########
+
     def change_gripper_to(self, end_effector: EndEffector) -> None:
         """Choose gripper to control.
 
@@ -156,6 +166,8 @@ class MairaKinematics(KinematicsInterface):
             tool_name=end_effector.name, tool_params=tool_params
         )
 
+###  defining fucntion fot motion program ###
+
     def set_motion_param(
         self, speed_mj: float, speed_ml: float, acc_mj: float, acc_ml: float
     ) -> None:
@@ -178,6 +190,9 @@ class MairaKinematics(KinematicsInterface):
         self.speed_move_linear = speed_ml
         self.acc_move_joint = acc_mj
         self.acc_move_linear = acc_ml
+        
+### defining fucntion for wait ######
+
 
     def wait(self, time_s: float) -> None:
         """Wait for given time
@@ -194,6 +209,8 @@ class MairaKinematics(KinematicsInterface):
 
         """
         time.sleep(time_s)
+
+### defining function for throw if trajectory invalid ####
 
     def _throw_if_trajectory_invalid(
         self, trajectory: List[List[float]]
@@ -213,6 +230,8 @@ class MairaKinematics(KinematicsInterface):
             )
         for joint_states in trajectory:
             self._throw_if_joint_invalid(joint_states)
+
+#### function for if joint invalid ###########
 
     def _throw_if_joint_invalid(self, joint_states: List[float]) -> None:
         """Throw error if given joint states is not valid.
@@ -235,6 +254,9 @@ class MairaKinematics(KinematicsInterface):
                     {self.num_joints}!"
             )
 
+
+####### funnction for throw if pose invalud ##########
+
     def _throw_if_pose_invalid(self, pose: List[float]) -> None:
         """Throw error if given pose is not valid.
 
@@ -246,6 +268,8 @@ class MairaKinematics(KinematicsInterface):
         """
         if not ((isinstance(pose, list)) and len(pose) == 6):
             raise TypeError("[ERROR] goal_pose should be a list with length 6!")
+
+### function for throw if list pose is invlaid ##########
 
     def _throw_if_list_poses_invalid(self, goal_poses: List[List[float]]):
         """Throw error if given list of poses is not valid.
@@ -263,17 +287,25 @@ class MairaKinematics(KinematicsInterface):
         for pose in goal_poses:
             self._throw_if_pose_invalid(pose)
 
+
+###### function for speed to percent ########
+
     # TODO not really used and implemented!
     def _speed_to_percent(self, speed_mps):
         if speed_mps is None:
             speed_mps = self.speed_move_joint
         return 50
 
+###### function for acceleration to percent ########
+
     # TODO not really used and implemented!
     def _acc_to_percent(self, acc):
         if acc is None:
             acc = self.acc_move_joint
         return 50
+
+
+#### function for gettting curretn joint state ############
 
     def _get_current_joint_state(self) -> List[float]:
         """Return current joint states.
@@ -285,6 +317,9 @@ class MairaKinematics(KinematicsInterface):
 
         """
         return self._robot_state.getRobotStatus("jointAngles")
+
+
+######## functin for getting curretn cartesian pose ###############
 
     def _get_current_cartesian_pose(self) -> List[float]:
         """Return current cartesian pose of the active TCP of the robot.
@@ -298,6 +333,9 @@ class MairaKinematics(KinematicsInterface):
         pose_quat = self._robot_state.getRobotStatus("cartesianPosition")
         return Pose(pose_quat[:3], pose_quat[-4:]).to_list()
 
+
+ ######## fucntion to execute if succesful or not  ###############
+ 
     def _execute_if_successful(self, id: int) -> bool:
         """Execute trajectory for given id if successfull.
 
@@ -341,6 +379,9 @@ class MairaKinematics(KinematicsInterface):
         """
         return self._get_current_joint_state()
 
+
+##### function for getting the current cartesian tcp pose ##########
+
     def get_current_cartesian_tcp_pose(self) -> List[float]:
         """Get the current cartesian tcp pose
 
@@ -350,12 +391,15 @@ class MairaKinematics(KinematicsInterface):
             Current Cartesian TCP pose as [x, y, z, r, p, y]
         """
         return self._get_current_cartesian_pose()
-
+ ########### function for defining the finish ########
+ 
     def finish(self) -> None:
         """Delete planned motion buffer from NeuraPy. Only call this when
         program is going to be stopped."""
         MairaKinematics._ID = 3e4
         self._program.finish()
+
+### defining fucntion for cartesian to joint ############
 
     def cartesian_2_joint(
         self,
@@ -407,6 +451,9 @@ class MairaKinematics(KinematicsInterface):
                 reference_joint_states=reference_joint_states,
             )
 
+
+###### defining function for gettig the ik solution ###########
+
     def _get_ik_solution(
         self,
         goal_pose_cartesian: List[float],
@@ -453,6 +500,9 @@ class MairaKinematics(KinematicsInterface):
         else:
             raise ValueError(f"IK solution return nan.")
 
+
+ ###########function foir getting the elbow up ik solution ###############
+ 
     def _get_elbow_up_ik_solution(
         self,
         goal_pose_cartesian: List[float],
@@ -510,6 +560,9 @@ class MairaKinematics(KinematicsInterface):
             self._logger.debug("Elbow down!")
             raise ValueError("Could not find elbow up solution")
 
+
+###### defining the function for motion till force ##########
+
     def set_motion_till_force(
         self, 
         stopping_forces: List[float]=[0.0, 0.0, 1.0], 
@@ -539,6 +592,9 @@ class MairaKinematics(KinematicsInterface):
             stopping_force_multiplier=1.0,
             activate_reflex_mode_after_contact=reflex_mode_after_contact
         )
+
+
+##### defining function for move joint to cartesian
 
     def move_joint_to_cartesian(
         self,
@@ -579,6 +635,10 @@ class MairaKinematics(KinematicsInterface):
 
         joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states)
         return self.move_joint_to_joint(joint_pose, speed, acc)
+
+
+
+### defining the function for moving joint to joint ############
 
     def move_joint_to_joint(
         self,
@@ -630,6 +690,9 @@ class MairaKinematics(KinematicsInterface):
             reusable_id=0,
         )
         return self._execute_if_successful(id=plan_id)
+
+
+########## defining function for move_linear ##############
 
     def move_linear(
         self,
@@ -688,6 +751,8 @@ class MairaKinematics(KinematicsInterface):
             reusable_id=0,
         )
         return self._execute_if_successful(id=plan_id)
+
+## defining function for move linear through point s##########
 
     def move_linear_via_points(
         self,
@@ -753,6 +818,8 @@ class MairaKinematics(KinematicsInterface):
             reusable_id=0,
         )
         return self._execute_if_successful(id=plan_id)
+    
+### defining function for moving joint via points #########
 
     def move_joint_via_points(
         self,
@@ -808,6 +875,9 @@ class MairaKinematics(KinematicsInterface):
             reusable_id=0,
         )
         return self._execute_if_successful(id=plan_id)
+
+
+## defining function for executing motion for ids  #######
 
     def execute(self, ids: List[int], execution_feasibilities: List[bool]):
         """Execute the motion for given id when the plan is succeed.
@@ -900,6 +970,8 @@ class MairaKinematics(KinematicsInterface):
             acc=acc,
             reusable=reusable,
         )
+        
+### defining function for plan motion from joint to joint ######
 
     def plan_motion_joint_to_joint(
         self,
@@ -980,6 +1052,9 @@ class MairaKinematics(KinematicsInterface):
             plan_id,
             last_joint_state,
         )
+
+
+#### defining function for moiton linear #######
 
     def plan_motion_linear(
         self,
@@ -1065,6 +1140,8 @@ class MairaKinematics(KinematicsInterface):
             plan_id,
             last_joint_state,
         )
+
+#### defining function for plan motion through points########
 
     def plan_motion_linear_via_points(
         self,
@@ -1164,6 +1241,8 @@ class MairaKinematics(KinematicsInterface):
             plan_id,
             last_joint_state,
         )
+        
+## definig function for planning motion through points########
 
     def plan_motion_joint_via_points(
         self,
@@ -1244,6 +1323,8 @@ class MairaKinematics(KinematicsInterface):
             last_joint_state,
         )
 
+#### definig function for clearign the ids ############
+
     def clear_ids(self, ids: List[int]) -> bool:
         """Clear given plan IDs from memory stack to prevent overload.
 
@@ -1266,6 +1347,8 @@ class MairaKinematics(KinematicsInterface):
         if not success:
             self._logger.warning(f"Fail to delete ids {ids}")
         return success
+    
+#### defining the function for checking the id is succesfull or not #############
 
     def _is_id_successful(
         self, plan_id: int, timeout: float = 10.0
