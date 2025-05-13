@@ -252,7 +252,7 @@ class MairaKinematics(KinematicsInterface):
             raise TypeError(
                 f"[ERROR] joint_states should be a list with length \
                     {self.num_joints}!"
-            )
+            ) # raise the Type error
 
 
 ####### funnction for throw if pose invalud ##########
@@ -294,7 +294,7 @@ class MairaKinematics(KinematicsInterface):
     def _speed_to_percent(self, speed_mps):
         if speed_mps is None: # if the speed_mps is None 
             speed_mps = self.speed_move_joint # setting the speeds_mps as speed_move_joint 
-        return 50
+        return 50 # return the speed as 50 
 
 ###### function for acceleration to percent ########
 
