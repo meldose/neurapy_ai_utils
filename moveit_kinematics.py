@@ -16,6 +16,8 @@ from neurapy_ai.utils.ros_conversions import pose_2_geometry_msg_pose, Pose
 
 
 class MoveitKinematics(KinematicsInterface):
+    
+ #### intialise the elements ######   
     def __init__(
         self,
     ):
@@ -37,6 +39,8 @@ class MoveitKinematics(KinematicsInterface):
         self.traj_id = 0
         # init paramter for cartesian path trajectory retiming
         self.kwargs = {"algorithm": "iterative_time_parameterization"}
+        
+##### defining the function for changing the gripper to ################
 
     def change_gripper_to(self, end_effector: EndEffector) -> None:
         """Choose gripper to control.
@@ -48,6 +52,8 @@ class MoveitKinematics(KinematicsInterface):
         """
         # TODO set endeffector pose
         self.group.set_endeffector(end_effector.name)
+        
+######### defining the function for movement from joint to cartesian #############
 
     def move_joint_to_cartesian(
         self,
@@ -112,6 +118,8 @@ class MoveitKinematics(KinematicsInterface):
                 "Failed to execute move_joint_to_cartesian action: " + str(e)
             )
 
+####### creating function for move joint to joint ############
+
     def move_joint_to_joint(
         self,
         pose_joint: List[float],
@@ -160,6 +168,8 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute move_joint_to_joint action: " + str(e)
             )
+            
+##### creating function for joint movement throgh points ##############
 
     def move_joint_via_points(
         self,
@@ -212,6 +222,8 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute move_joint_via_points action: " + str(e)
             )
+            
+####### creating fucntion for move linear through points ############
 
     def move_linear_via_points(
         self,
@@ -294,6 +306,8 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute move_linear_via_points: " + str(e)
             )
+            
+########### creatign function for move_linear ############
 
     def move_linear(
         self,
@@ -363,6 +377,8 @@ class MoveitKinematics(KinematicsInterface):
             return success
         except Exception as e:
             raise RuntimeError("Failed to execute move_linear: " + str(e))
+        
+### creating function for wait signal #############
 
     def wait(self, time_s: float) -> None:
         """Wait for given time in seconds.
@@ -380,6 +396,8 @@ class MoveitKinematics(KinematicsInterface):
             rospy.sleep(time_s)
         except Exception as e:
             raise RuntimeError("Failed to execute wait: " + str(e))
+        
+######### creating function for converting cartesian to joint ###############
 
     def cartesian_2_joint(
         self,
@@ -447,6 +465,9 @@ class MoveitKinematics(KinematicsInterface):
         else:
             solution = res.solution.joint_state.position
         return solution
+    
+
+### creating function for setting the motion program  ########
 
     def set_motion_param(
         self, speed_mj: float, speed_ml: float, acc_mj: float, acc_ml: float
@@ -469,6 +490,8 @@ class MoveitKinematics(KinematicsInterface):
         self.group.set_max_acceleration_scaling_factor = acc_mj / 100
         self.kwargs["velocity_scaling_factor"] = speed_ml / 100
         self.kwargs["acceleration_scaling_factor"] = acc_ml / 100
+        
+########### creating function for getting the current joint states #########
 
     def get_current_joint_state(self) -> List[float]:
         """Get the current joint state as a list of floats
@@ -481,6 +504,8 @@ class MoveitKinematics(KinematicsInterface):
 
         joint_positions = self.group.get_current_joint_values()
         return joint_positions
+
+########## creating the fucntion for getting the current cartesian tcp pose ########
 
     def get_current_cartesian_tcp_pose(self) -> List[float]:
         """Get the current tcp pose as a list of floats
@@ -509,6 +534,8 @@ class MoveitKinematics(KinematicsInterface):
             y,
         )
         return tcp_pose
+    
+### creating function for excecuting ############
 
     def execute(
         self,
@@ -545,6 +572,8 @@ class MoveitKinematics(KinematicsInterface):
                 self.group.execute(trajectory_msg, wait=True)
             except Exception as e:
                 raise RuntimeError("Failed to execute: " + str(e))
+            
+####### creating function for plan motion to cartesian ##########
 
     def plan_motion_joint_to_cartesian(
         self,
@@ -639,6 +668,8 @@ class MoveitKinematics(KinematicsInterface):
                 "Failed to execute plan_motion_joint_to_cartesian action: "
                 + str(e)
             )
+            
+###### creating function for plan motion to joint ##########
 
     def plan_motion_joint_to_joint(
         self,
@@ -709,6 +740,8 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute plan_motion_joint_to_joint action: " + str(e)
             )
+            
+###### creating function for plan motion linear ##############
 
     def plan_motion_linear(
         self,
@@ -800,6 +833,8 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute plan_motion_linear action: " + str(e)
             )
+            
+######### creating function for plan motion for joint through points ##############
 
     def plan_motion_joint_via_points(
         self,
@@ -872,6 +907,9 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute plan_motion_joint_to_joint action: " + str(e)
             )
+
+
+###### creating function for plan motion linear through points ###########
 
     def plan_motion_linear_via_points(
         self,
@@ -983,10 +1021,14 @@ class MoveitKinematics(KinematicsInterface):
             raise RuntimeError(
                 "Failed to execute plan_motion_linear action: " + str(e)
             )
+            
+####### defining the function for fisniu
 
     def finish(self) -> None:
         # TODO
         self._logger.error("not implemented yet")
+        
+######## setting function for clearing the ids ###############
 
     def clear_ids(self, ids: List[int]) -> bool:
         """Clear given plan IDs from memory stack to prevent overload.
@@ -1013,6 +1055,8 @@ class MoveitKinematics(KinematicsInterface):
             return True
         except Exception as e:
             raise RuntimeError("Failed to delete ids: " + str(e))
+        
+####### setting function for adding the id #############
 
     def _add_id(
         self,
