@@ -149,7 +149,7 @@ class MairaKinematics(KinematicsInterface):
         """
         # Set tool only if not already set
         for tool in self._robot.get_tools():
-            if tool["name"] == end_effector.name:
+            if tool["name"] == end_effector.name: # checking if the tool name is there not 
                 return
 
         tcp_pose = end_effector.tcp_pose.to_list()
@@ -162,7 +162,7 @@ class MairaKinematics(KinematicsInterface):
         tool_params[6] = tcp_pose[2]
 
         self._robot.set_tool(
-            tool_name=end_effector.name, tool_params=tool_params
+            tool_name=end_effector.name, tool_params=tool_params # setting the tool name
         )
 
 ###  defining function fot motion program ###
@@ -185,11 +185,11 @@ class MairaKinematics(KinematicsInterface):
             Acceleration for move linear, m/sec2
 
         """
-        self.speed_move_joint = speed_mj
-        self.speed_move_linear = speed_ml
+        self.speed_move_joint = speed_mj # setting the move_joint 
+        self.speed_move_linear = speed_ml # setting the move_linear 
         
-        self.acc_move_joint = acc_mj
-        self.acc_move_linear = acc_ml
+        self.acc_move_joint = acc_mj # setting the accleration to move_joint
+        self.acc_move_linear = acc_ml # setting the acceleration to move_linear 
         
 ### defining function for wait ######
 
@@ -208,7 +208,7 @@ class MairaKinematics(KinematicsInterface):
             If action failed
 
         """
-        time.sleep(time_s)
+        time.sleep(time_s) # setting time sleep for wait 
 
 ### defining function for throw if trajectory invalid ####
 
@@ -223,12 +223,12 @@ class MairaKinematics(KinematicsInterface):
             Joint trajectory
 
         """
-        if not (isinstance(trajectory, list)):
+        if not (isinstance(trajectory, list)): # if not reuired trajectory raise the error 
             raise TypeError(
                 f"[ERROR] trajectory should be a List[List[float*\
                     {self.num_joints}]]!"
             )
-        for joint_states in trajectory:
+        for joint_states in trajectory: # checking the joint states in the trajectory 
             self._throw_if_joint_invalid(joint_states)
 
 #### function for if joint invalid ###########
@@ -242,11 +242,11 @@ class MairaKinematics(KinematicsInterface):
             Joint trajectory
 
         """
-        if isinstance(joint_states, tuple):
+        if isinstance(joint_states, tuple): # checking if the join states are tuple or not , convert them into list 
             joint_states = list(joint_states)
 
         if not (
-            (isinstance(joint_states, list))
+            (isinstance(joint_states, list)) # if in the list , checking if the lenght of the joint states are eual to the number of joint
             and len(joint_states) == self.num_joints
         ):
             raise TypeError(
@@ -266,8 +266,8 @@ class MairaKinematics(KinematicsInterface):
             Joint trajectory
 
         """
-        if not ((isinstance(pose, list)) and len(pose) == 6):
-            raise TypeError("[ERROR] goal_pose should be a list with length 6!")
+        if not ((isinstance(pose, list)) and len(pose) == 6): # checking if the pose is in the list and len of the pose is zero or not
+            raise TypeError("[ERROR] goal_pose should be a list with length 6!") # raise the error
 
 ### function for throw if list pose is invlaid ##########
 
@@ -280,11 +280,11 @@ class MairaKinematics(KinematicsInterface):
             Joint trajectory
 
         """
-        if not isinstance(goal_poses, list):
+        if not isinstance(goal_poses, list): # checking if the goal pose are in the list or not 
             raise TypeError(
                 "[ERROR] goal_pose should be a List[List[float*6]]!"
             )
-        for pose in goal_poses:
+        for pose in goal_poses: # checking the goal_poses
             self._throw_if_pose_invalid(pose)
 
 
@@ -292,17 +292,17 @@ class MairaKinematics(KinematicsInterface):
 
     # TODO not really used and implemented!
     def _speed_to_percent(self, speed_mps):
-        if speed_mps is None:
-            speed_mps = self.speed_move_joint
+        if speed_mps is None: # if the speed_mps is None 
+            speed_mps = self.speed_move_joint # setting the speeds_mps as speed_move_joint 
         return 50
 
 ###### function for acceleration to percent ########
 
     # TODO not really used and implemented!
-    def _acc_to_percent(self, acc):
-        if acc is None:
-            acc = self.acc_move_joint
-        return 50
+    def _acc_to_percent(self, acc): 
+        if acc is None: # if the acceleration is None 
+            acc = self.acc_move_joint # setting the acceleration to move_to_joint
+        return 50 # returns acceleration as 50
 
 
 #### function for gettting curretn joint state ############
@@ -316,7 +316,7 @@ class MairaKinematics(KinematicsInterface):
             Joint states
 
         """
-        return self._robot_state.getRobotStatus("jointAngles")
+        return self._robot_state.getRobotStatus("jointAngles") # returning the robot state wiht Joint Angles 
 
 
 ######## functin for getting curretn cartesian pose ###############
@@ -330,8 +330,8 @@ class MairaKinematics(KinematicsInterface):
             6D pose of the TCP as list of 6 floats [x, y, z, rx, ry, rz]
 
         """
-        pose_quat = self._robot_state.getRobotStatus("cartesianPosition")
-        return Pose(pose_quat[:3], pose_quat[-4:]).to_list()
+        pose_quat = self._robot_state.getRobotStatus("cartesianPosition") # setting the robot status as cartesian position
+        return Pose(pose_quat[:3], pose_quat[-4:]).to_list() # return the pose with X,Y,Z  and qx,qy,qz and qw 
 
 
  ######## function to execute if succesful or not  ###############
@@ -350,7 +350,7 @@ class MairaKinematics(KinematicsInterface):
             Returns True if execution successfull. False, otherwise.
 
         """
-        plan_success, execution_feasibility = self._is_id_successful(id)
+        plan_success, execution_feasibility = self._is_id_successful(id) # if exectue is successful set the plan_success
         self._logger.debug(
             "MairaKinematics::execute_if_successful: plan_success: "
             + str(plan_success)
@@ -359,7 +359,7 @@ class MairaKinematics(KinematicsInterface):
             + " id: "
             + str(id)
         )
-        if plan_success and execution_feasibility:
+        if plan_success and execution_feasibility: # if success then 
             self._logger.debug("*" * 40)
             self._logger.debug(f"execute id {id}")
             self._program.execute([id])
@@ -367,7 +367,7 @@ class MairaKinematics(KinematicsInterface):
             f"After execute id: {id}. joint state is: \
                 {self._get_current_joint_state()}"
         )
-        return plan_success
+        return plan_success # return the plan_success
 
     def get_current_joint_state(self) -> List[float]:
         """Get the current joint state as a list of floats
@@ -377,7 +377,7 @@ class MairaKinematics(KinematicsInterface):
         List[float]
             Current joint positions
         """
-        return self._get_current_joint_state()
+        return self._get_current_joint_state() # getting the current joint state 
 
 
 ##### function for getting the current cartesian tcp pose ##########
@@ -389,8 +389,9 @@ class MairaKinematics(KinematicsInterface):
         -------
         List[float]
             Current Cartesian TCP pose as [x, y, z, r, p, y]
-        """
-        return self._get_current_cartesian_pose()
+        """ 
+        return self._get_current_cartesian_pose() # getting the current cartesian pose 
+    
  ########### function for defining the finish ########
  
     def finish(self) -> None:
@@ -430,34 +431,34 @@ class MairaKinematics(KinematicsInterface):
             IK solver failed
 
         """
-        if not isinstance(goal_pose_cartesian, list):
+        if not isinstance(goal_pose_cartesian, list): # checking if the goal pose cartesian is in the list or not 
             raise TypeError("cartesian_pose must be of type list")
 
-        self._throw_if_pose_invalid(goal_pose_cartesian)
+        self._throw_if_pose_invalid(goal_pose_cartesian) 
 
         reference_joint_states = (
             self._get_current_joint_state()
             if reference_joint_states is None
             else reference_joint_states
-        )
+        ) # setting the current joint states
         if not self.require_elbow_up:
             return self._get_ik_solution(
                 goal_pose_cartesian=goal_pose_cartesian,
                 reference_joint_states=reference_joint_states,
-            )
+            ) # return the ik solution
         else:
             return self._get_elbow_up_ik_solution(
                 goal_pose_cartesian=goal_pose_cartesian,
                 reference_joint_states=reference_joint_states,
-            )
+            ) # getting the elbow_up_ik solution
 
 
 ###### defining function for gettig the ik solution ###########
 
     def _get_ik_solution(
         self,
-        goal_pose_cartesian: List[float],
-        reference_joint_states: List[float],
+        goal_pose_cartesian: List[float], # setting the goal_pose _cartesian
+        reference_joint_states: List[float], # setting the reference joint states
     ) -> List[float]:
         """Get the inverse kinematics for a given cartesion pose and reference joint states.
 
@@ -598,10 +599,10 @@ class MairaKinematics(KinematicsInterface):
 
     def move_joint_to_cartesian(
         self,
-        goal_pose: List[float],
-        reference_joint_states: Union[List[float], None] = None,
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
+        goal_pose: List[float], # setting the goal_pose 
+        reference_joint_states: Union[List[float], None] = None, # setting the joint states
+        speed: Optional[int] = None, # setting the speed
+        acc: Optional[int] = None, # setting the acceleration
     ) -> bool:
         """Execute move joint action with given goal, speed and acceleration
 
@@ -633,8 +634,8 @@ class MairaKinematics(KinematicsInterface):
         """
         self._throw_if_pose_invalid(goal_pose)
 
-        joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states)
-        return self.move_joint_to_joint(joint_pose, speed, acc)
+        joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states) # converting the cartesian to joint 
+        return self.move_joint_to_joint(joint_pose, speed, acc) # returning the move joint to joint 
 
 
 
@@ -642,10 +643,10 @@ class MairaKinematics(KinematicsInterface):
 
     def move_joint_to_joint(
         self,
-        goal_pose: List[float],
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-    ) -> bool:
+        goal_pose: List[float], # setting the goal pose 
+        speed: Optional[int] = None, # setting the speed for the movement 
+        acc: Optional[int] = None, # setting the acceleration for the robot movement 
+    ) -> bool: 
         """Execute move joint action with given goal, speed and acceleration
 
         Parameters
@@ -756,12 +757,12 @@ class MairaKinematics(KinematicsInterface):
 
     def move_linear_via_points(
         self,
-        goal_poses: List[List[float]],
-        speed: Optional[float] = None,
-        acc: Optional[float] = None,
-        rot_speed: Optional[float] = None,
-        rot_acc: Optional[float] = None,
-        blending_radius: Optional[float] = None,
+        goal_poses: List[List[float]], # setting the  poses
+        speed: Optional[float] = None,# setting the  speed
+        acc: Optional[float] = None,# setting the acc
+        rot_speed: Optional[float] = None,# setting the  rot speed
+        rot_acc: Optional[float] = None,# setting the rot_acc
+        blending_radius: Optional[float] = None,# setting the blending radius
     ) -> bool:
         """Execute move linear via points action with given goal, speed and
         acceleration
@@ -817,7 +818,7 @@ class MairaKinematics(KinematicsInterface):
             current_joint_angles=plan_id,
             reusable_id=0,
         )
-        return self._execute_if_successful(id=plan_id)
+        return self._execute_if_successful(id=plan_id) # return the execution if successful 
     
 ### defining function for moving joint via points #########
 
@@ -949,8 +950,8 @@ class MairaKinematics(KinematicsInterface):
         RuntimeError
             Planning failed
         """
-        if start_joint_states is None:
-            start_joint_states = self._get_current_joint_state()
+        if start_joint_states is None: # if the start joint states is None 
+            start_joint_states = self._get_current_joint_state() # setting the joint states with the current joint states
 
         self._throw_if_pose_invalid(goal_pose)
         self._throw_if_joint_invalid(start_joint_states)
@@ -1016,10 +1017,10 @@ class MairaKinematics(KinematicsInterface):
             Planning failed
         """
 
-        if start_joint_states is None:
-            start_joint_states = self._get_current_joint_state()
+        if start_joint_states is None: # if the start joint states is None 
+            start_joint_states = self._get_current_joint_state() # getting the current joint states
 
-        self._throw_if_joint_invalid(goal_pose)
+        self._throw_if_joint_invalid(goal_pose) 
         self._throw_if_joint_invalid(start_joint_states)
 
         if start_joint_states is None:
@@ -1104,13 +1105,13 @@ class MairaKinematics(KinematicsInterface):
 
         """
 
-        if not all([start_cartesian_pose, start_joint_states]):
+        if not all([start_cartesian_pose, start_joint_states]): # checking start cartesian pose and start joint states
             # Set start state to current pose only if neither of
             # start pose nor start joint state are set
-            start_cartesian_pose = self._get_current_cartesian_pose()
-            start_joint_states = self._get_current_joint_state()
+            start_cartesian_pose = self._get_current_cartesian_pose() # getting the current cartesian pose 
+            start_joint_states = self._get_current_joint_state() # getting the curretn joint state
 
-        self._throw_if_pose_invalid(goal_pose)
+        self._throw_if_pose_invalid(goal_pose) 
         self._throw_if_pose_invalid(start_cartesian_pose)
         self._throw_if_joint_invalid(start_joint_states)
 
@@ -1202,11 +1203,11 @@ class MairaKinematics(KinematicsInterface):
             Planning failed
 
         """
-        if not all([start_cartesian_pose, start_joint_states]):
+        if not all([start_cartesian_pose, start_joint_states]): # checking if the it is start cartesian posea and start joint states
             # Set start state to current pose only if neither of
             # start pose nor start joint state are set
-            start_cartesian_pose = self._get_current_cartesian_pose()
-            start_joint_states = self._get_current_joint_state()
+            start_cartesian_pose = self._get_current_cartesian_pose() # getting the current the cartesian poses
+            start_joint_states = self._get_current_joint_state() # getting the current joint state 
 
         self._throw_if_list_poses_invalid(goal_poses)
         self._throw_if_pose_invalid(start_cartesian_pose)
@@ -1290,8 +1291,8 @@ class MairaKinematics(KinematicsInterface):
         RuntimeError
             Planning failed
         """
-        if start_joint_states is None:
-            start_joint_states = self._get_current_joint_state()
+        if start_joint_states is None: # if the start joint state is None 
+            start_joint_states = self._get_current_joint_state() # getting the current joint state
 
         self._throw_if_trajectory_invalid(trajectory)
         self._throw_if_joint_invalid(start_joint_states)
@@ -1325,7 +1326,7 @@ class MairaKinematics(KinematicsInterface):
 
 #### definig function for clearign the ids ############
 
-    def clear_ids(self, ids: List[int]) -> bool:
+    def clear_ids(self, ids: List[int]) -> bool: 
         """Clear given plan IDs from memory stack to prevent overload.
 
         Parameters
@@ -1343,8 +1344,8 @@ class MairaKinematics(KinematicsInterface):
         corba_cmd_id = CORBA.Any(
             CORBA.TypeCode("IDL:omg.org/CORBA/DoubleSeq:1.0"), ids
         )
-        success = rts.callService("clearSplineId", [corba_cmd_id]) == 0
-        if not success:
+        success = rts.callService("clearSplineId", [corba_cmd_id]) == 0 # setting the success rate 
+        if not success: # if not success raise the error 
             self._logger.warning(f"Fail to delete ids {ids}")
         return success
     
@@ -1374,19 +1375,19 @@ class MairaKinematics(KinematicsInterface):
 
         """
         try:
-            t_start = time.time()
-            status = self._program.get_plan_status(plan_id)
+            t_start = time.time() # setting the start time  
+            status = self._program.get_plan_status(plan_id) # setting the status 
             while (
-                status != calculation.Failed
-                and status != calculation.Success
-                and (time.time() - t_start) < timeout
+                status != calculation.Failed # if the status is not Failed 
+                and status != calculation.Success # if the status si not success
+                and (time.time() - t_start) < timeout # checking if the time is less than the actual timeout 
             ):
                 time.sleep(0.01)
                 status = self._program.get_plan_status(plan_id)
-            if status == calculation.Success:
-                return True, True
-            else:
-                return False, False
+            if status == calculation.Success: # if the status is sucess
+                return True, True # return True 
+            else: 
+                return False, False # else return false condition
         except Exception as ex:
-            self._logger.error(f"Motion Id {plan_id} doesn't exist: {str(ex)}")
+            self._logger.error(f"Motion Id {plan_id} doesn't exist: {str(ex)}") # raise the Exception values 
             raise ex
