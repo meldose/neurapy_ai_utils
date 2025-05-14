@@ -742,8 +742,7 @@ def get_current_joint_state(self) -> List[float]:
         RuntimeError
             Action failed
         """
-        self._throw_if_pose_invalid(goal_pose)
-
+        self._throw_if_pose_invalid(goal_pose) # To check if the goal pose is valid or not 
         linear_property = {
             "target_pose": [self._get_current_cartesian_pose(), goal_pose], # setting the target pose
             "speed": self.speed_move_linear if speed is None else speed, # setting the speed
@@ -807,7 +806,7 @@ def get_current_joint_state(self) -> List[float]:
         RuntimeError
             Action failed
         """
-        self._throw_if_list_poses_invalid(goal_poses)
+        self._throw_if_list_poses_invalid(goal_poses) # checking if the robot move to the correct goal pose or not 
 
         goal_poses.insert(0, self._get_current_cartesian_pose())
         linear_property = {
@@ -982,7 +981,7 @@ def get_current_joint_state(self) -> List[float]:
             reusable=reusable,
         ) # returning the function
         
-### defining function for plan motion from joint to joint ######
+### defining function for motion from joint to joint ######
 
     def plan_motion_joint_to_joint(
         self,
