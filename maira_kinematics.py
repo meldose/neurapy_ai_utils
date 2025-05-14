@@ -193,7 +193,6 @@ class MairaKinematics(KinematicsInterface):
         
 ### defining function for wait ######
 
-
     def wait(self, time_s: float) -> None:
         """Wait for given time
 
@@ -287,6 +286,8 @@ class MairaKinematics(KinematicsInterface):
         for pose in goal_poses: # checking the goal_poses
             self._throw_if_pose_invalid(pose)
 
+###### FUNCTIONS NEED TO WORK ###########################
+
 # ###### function for speed to percent ########
 
 #     # TODO not really used and implemented!
@@ -303,6 +304,8 @@ class MairaKinematics(KinematicsInterface):
 #             acc = self.acc_move_joint # setting the acceleration to move_to_joint
 #         return 50 # returns acceleration as 50
 
+#################################################################
+
 
 #### function for gettting curretn joint state ############
 
@@ -318,7 +321,7 @@ class MairaKinematics(KinematicsInterface):
         return self._robot_state.getRobotStatus("jointAngles") # returning the robot state wiht Joint Angles 
 
 
-######## functin for getting curretn cartesian pose ###############
+######## function for getting curretn cartesian pose ###############
 
     def _get_current_cartesian_pose(self) -> List[float]:
         """Return current cartesian pose of the active TCP of the robot.
@@ -507,7 +510,7 @@ def get_current_joint_state(self) -> List[float]:
             raise ValueError(f"IK solution return nan.") # raise an Value Error
 
 
- ###########function foir getting the elbow up ik solution ###############
+ ###########function for getting the elbow up ik solution ###############
  
     def _get_elbow_up_ik_solution(
         self,
