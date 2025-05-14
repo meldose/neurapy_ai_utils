@@ -290,7 +290,7 @@ class MairaKinematics(KinematicsInterface):
 
 # ###### function for speed to percent ########
 
-#     # TODO not really used and implemented!
+
 #     def _speed_to_percent(self, speed_mps):
 #         if speed_mps is None: # if the speed_mps is None 
 #             speed_mps = self.speed_move_joint # setting the speeds_mps as speed_move_joint 
@@ -298,7 +298,7 @@ class MairaKinematics(KinematicsInterface):
 
 # ###### function for acceleration to percent ########
 
-#     # TODO not really used and implemented!
+
 #     def _acc_to_percent(self, acc): 
 #         if acc is None: # if the acceleration is None 
 #             acc = self.acc_move_joint # setting the acceleration to move_to_joint
