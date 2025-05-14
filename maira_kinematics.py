@@ -157,6 +157,7 @@ class MairaKinematics(KinematicsInterface):
         tool_params[1] = tcp_pose[3]
         tool_params[2] = tcp_pose[4]
         tool_params[3] = tcp_pose[5]
+
         tool_params[4] = tcp_pose[0]
         tool_params[5] = tcp_pose[1]
         tool_params[6] = tcp_pose[2]
@@ -447,7 +448,8 @@ def get_current_joint_state(self) -> List[float]:
         reference_joint_states = (
             self._get_current_joint_state() # getting the current joint states
             if reference_joint_states is None # if the reference joint states is None 
-            else reference_joint_states
+    
+
         ) # setting the current joint states
         if not self.require_elbow_up: # if it is not elbow up
             return self._get_ik_solution(
@@ -604,6 +606,11 @@ def get_current_joint_state(self) -> List[float]:
         )
 
 
+
+
+#### TO DO MOVEMENT FOR JOINT MOTION #########################
+
+
 ##### defining function for move joint to cartesian
 
     def move_joint_to_cartesian(
@@ -690,6 +697,8 @@ def get_current_joint_state(self) -> List[float]:
             "interpolator": 1,
             "enable_blending": True,
         }
+
+
 
         plan_id = self._id_manager.update_id()
         self._program.set_command(
@@ -1334,6 +1343,15 @@ def get_current_joint_state(self) -> List[float]:
             plan_id,
             last_joint_state,
         ) # returning the success flags, plan_id , latest joint states 
+
+
+
+############# END ###################################################
+
+
+
+
+
 
 #### defining function for clearign the ids ############
 
