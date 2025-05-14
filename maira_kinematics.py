@@ -287,7 +287,6 @@ class MairaKinematics(KinematicsInterface):
         for pose in goal_poses: # checking the goal_poses
             self._throw_if_pose_invalid(pose)
 
-
 # ###### function for speed to percent ########
 
 #     # TODO not really used and implemented!
@@ -968,7 +967,7 @@ def get_current_joint_state(self) -> List[float]:
             joint_pose = self.cartesian_2_joint(
                 goal_pose, reference_joint_states
             )
-        except ValueError as e: # raise and except value Error 
+        except ValueError as e: # raise an exception value Error 
             self._logger.error(e)
             return False, None, []
 
@@ -1028,8 +1027,8 @@ def get_current_joint_state(self) -> List[float]:
         if start_joint_states is None: # if the start joint states is None 
             start_joint_states = self._get_current_joint_state() # getting the current joint states
 
-        self._throw_if_joint_invalid(goal_pose) 
-        self._throw_if_joint_invalid(start_joint_states)
+        self._throw_if_joint_invalid(goal_pose) # checking if the goal pose is valid or not 
+        self._throw_if_joint_invalid(start_joint_states)# checking if the joint states is valid or not 
 
         if start_joint_states is None: # if the stat joint states is None then 
             start_joint_states = self._get_current_joint_state() # getting the current joint states 
