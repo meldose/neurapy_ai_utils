@@ -495,7 +495,7 @@ class MairaKinematics(KinematicsInterface):
                     current_joint=dummy_array,# setting the current joint
                 )
             except Exception as e:
-                self._logger.debug(e)
+                self._logger.debug(e) # raise an exception error 
                 self._logger.debug(f"No IK solution found after {i} attempts")
                 continue
             if not np.any(np.isnan(solution)):
