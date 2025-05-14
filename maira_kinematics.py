@@ -148,7 +148,7 @@ class MairaKinematics(KinematicsInterface):
 
         """
         # Set tool only if not already set
-        for tool in self._robot.get_tools():
+        for tool in self._robot.get_tools(): 
             if tool["name"] == end_effector.name: # checking if the tool name is there not 
                 return
 
@@ -392,7 +392,7 @@ class MairaKinematics(KinematicsInterface):
         List[float]
             Current Cartesian TCP pose as [x, y, z, r, p, y]
         """ 
-        return self._get_current_cartesian_pose() # getting the current cartesian pose 
+        return self._get_current_cartesian_pose() # getting the current cartesian tcp poses
     
  ########### function for defining the finish ########
  
