@@ -254,7 +254,7 @@ class MairaKinematics(KinematicsInterface):
             ) # raise the Type error
 
 
-####### function for throw if pose invalud ##########
+####### function for throw if pose invalid ##########
 
     def _throw_if_pose_invalid(self, pose: List[float]) -> None:
         """Throw error if given pose is not valid.
@@ -321,7 +321,7 @@ class MairaKinematics(KinematicsInterface):
         return self._robot_state.getRobotStatus("jointAngles") # returning the robot state wiht Joint Angles 
 
 
-######## function for getting curretn cartesian pose ###############
+######## function for getting current cartesian pose ###############
 
     def _get_current_cartesian_pose(self) -> List[float]:
         """Return current cartesian pose of the active TCP of the robot.
@@ -490,7 +490,7 @@ def get_current_joint_state(self) -> List[float]:
         """
         solution = [] # creating an empty list of solution
         for i in range(100):
-            np.random.seed(i) # ensure each iteration produces the 
+            np.random.seed(i) # ensure each iteration has a consistent random seed number
             dummy_array = (
                 reference_joint_states + np.random.randn(self.num_joints) * 1e-2
             ) # multiplying the scale noise 
@@ -1119,7 +1119,7 @@ def get_current_joint_state(self) -> List[float]:
             # Set start state to current pose only if neither of
             # start pose nor start joint state are set
             start_cartesian_pose = self._get_current_cartesian_pose() # getting the current cartesian pose 
-            start_joint_states = self._get_current_joint_state() # getting the curretn joint state
+            start_joint_states = self._get_current_joint_state() # getting the current joint state
 
         self._throw_if_pose_invalid(goal_pose) # checking if the goal pose is valid or not 
         self._throw_if_pose_invalid(start_cartesian_pose) # checking if the cartesian pose  is valid or not 
