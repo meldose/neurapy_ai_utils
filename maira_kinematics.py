@@ -371,15 +371,19 @@ class MairaKinematics(KinematicsInterface):
     
 ##### defining function for getting the current joint state ###########
 
-    def get_current_joint_state(self) -> List[float]:
-        """Get the current joint state as a list of floats
+def get_current_joint_state(self) -> List[float]:
+    """
+    Retrieves the current joint positions of the robot.
 
-        Returns
-        -------
-        List[float]
-            Current joint positions
-        """
-        return self._get_current_joint_state() # getting the current joint state 
+    Returns
+    -------
+    List[float]
+        A list of float values representing the current joint angles/positions.
+        These are typically expressed in radians or degrees, depending on the robot's configuration.
+    """
+    # Delegate the call to the internal method that interfaces with the robot hardware or simulator.
+    # This method abstracts the low-level details of reading joint states.
+    return self._get_current_joint_state()
 
 
 ##### function for getting the current cartesian tcp pose ##########
@@ -1059,7 +1063,7 @@ class MairaKinematics(KinematicsInterface):
         ) # returning the success flags, plan_id and last joint state
 
 
-#### defining function for moiton linear #######
+#### defining function for motion linear #######
 
     def plan_motion_linear(
         self,
@@ -1345,14 +1349,24 @@ class MairaKinematics(KinematicsInterface):
             Clearing success
 
         """
-        rts = Component(self._robot, "RTS") # setting up the RTS component
+        # Initialize the RTS component for interacting with the robot's real-time system
+        rts = Component(self._robot, "RTS")
+
+        # Wrap the list of IDs in a CORBA-compatible DoubleSeq type
         corba_cmd_id = CORBA.Any(
             CORBA.TypeCode("IDL:omg.org/CORBA/DoubleSeq:1.0"), ids
         )
-        success = rts.callService("clearSplineId", [corba_cmd_id]) == 0 # setting the success rate 
-        if not success: # if not success raise the error 
+
+        # Call the 'clearSplineId' service on the RTS component and check if it succeeded (return value 0 indicates success)
+        success = rts.callService("clearSplineId", [corba_cmd_id]) == 0
+
+        # If the service call failed, log a warning with the list of IDs that could not be deleted
+        if not success:
             self._logger.warning(f"Fail to delete ids {ids}")
-        return success # returning the success
+
+        # Return the result of the operation (True if successful, False otherwise)
+        return success
+
     
 #### defining the function for checking the id is succesfull or not #############
 
