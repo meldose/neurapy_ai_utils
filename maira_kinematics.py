@@ -288,21 +288,21 @@ class MairaKinematics(KinematicsInterface):
             self._throw_if_pose_invalid(pose)
 
 
-###### function for speed to percent ########
+# ###### function for speed to percent ########
 
-    # TODO not really used and implemented!
-    def _speed_to_percent(self, speed_mps):
-        if speed_mps is None: # if the speed_mps is None 
-            speed_mps = self.speed_move_joint # setting the speeds_mps as speed_move_joint 
-        return 50 # return the speed as 50 
+#     # TODO not really used and implemented!
+#     def _speed_to_percent(self, speed_mps):
+#         if speed_mps is None: # if the speed_mps is None 
+#             speed_mps = self.speed_move_joint # setting the speeds_mps as speed_move_joint 
+#         return 50 # return the speed as 50 
 
-###### function for acceleration to percent ########
+# ###### function for acceleration to percent ########
 
-    # TODO not really used and implemented!
-    def _acc_to_percent(self, acc): 
-        if acc is None: # if the acceleration is None 
-            acc = self.acc_move_joint # setting the acceleration to move_to_joint
-        return 50 # returns acceleration as 50
+#     # TODO not really used and implemented!
+#     def _acc_to_percent(self, acc): 
+#         if acc is None: # if the acceleration is None 
+#             acc = self.acc_move_joint # setting the acceleration to move_to_joint
+#         return 50 # returns acceleration as 50
 
 
 #### function for gettting curretn joint state ############
@@ -402,7 +402,7 @@ class MairaKinematics(KinematicsInterface):
         MairaKinematics._ID = 3e4 # setting the MairaKinematics class to 30000.0
         self._program.finish() # stop the execution and disengage the robot controller
 
-### defining function for cartesian to joint ############
+### defining function for converting the cartesian to joint ############
 
     def cartesian_2_joint(
         self,
@@ -482,7 +482,7 @@ class MairaKinematics(KinematicsInterface):
             IK solver failed
 
         """
-        solution = [] # creating and empty list of solution
+        solution = [] # creating an empty list of solution
         for i in range(100):
             np.random.seed(i)
             dummy_array = (
@@ -491,9 +491,9 @@ class MairaKinematics(KinematicsInterface):
             try:
                 solution = self._robot.ik_fk(
                     "ik",
-                    target_pose=goal_pose_cartesian, # setting the target pose 
-                    current_joint=dummy_array,# setting the current joint
-                )
+                    target_pose=goal_pose_cartesian, 
+                    current_joint=dummy_array,
+                ) # getting the forward kinematics by setting the target_pose and current _joint
             except Exception as e:
                 self._logger.debug(e) # raise an exception error 
                 self._logger.debug(f"No IK solution found after {i} attempts")
@@ -553,7 +553,7 @@ class MairaKinematics(KinematicsInterface):
                 solution = self._get_ik_solution(
                     goal_pose_cartesian=goal_pose_cartesian,
                     reference_joint_states=seed_joint,
-                )
+                ) # getting the ik solution
                 if self._elbow_checker.is_up(solution):
                     self._logger.debug("Elbow up!")
                     return solution
@@ -634,7 +634,7 @@ class MairaKinematics(KinematicsInterface):
         RuntimeError
             If action failed
         """
-        self._throw_if_pose_invalid(goal_pose)
+        self._throw_if_pose_invalid(goal_pose) # checking if the goalpose is valid or not 
 
         joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states) # converting the cartesian to joint 
         return self.move_joint_to_joint(joint_pose, speed, acc) # returning the move joint to joint 
