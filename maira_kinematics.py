@@ -537,12 +537,13 @@ def get_current_joint_state(self) -> List[float]:
             IK solver failed.
 
         """
+    # orientation in different axis     
         retry_delta_angle_states = [
             [0.0, 0.0],
             [0.0, np.pi],
             [np.pi, 0.0],
             [np.pi, np.pi],
-        ] # orientation in different axis 
+        ] 
         for retry_delta_angle_state in retry_delta_angle_states:
             seed_joint = deepcopy(reference_joint_states)
             seed_joint[5] = (
