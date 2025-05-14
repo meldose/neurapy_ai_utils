@@ -307,7 +307,7 @@ class MairaKinematics(KinematicsInterface):
 #################################################################
 
 
-#### function for gettting curretn joint state ############
+#### function for gettting current joint state ############
 
     def _get_current_joint_state(self) -> List[float]:
         """Return current joint states.
