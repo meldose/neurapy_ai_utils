@@ -254,7 +254,7 @@ class MairaKinematics(KinematicsInterface):
             ) # raise the Type error
 
 
-####### funnction for throw if pose invalud ##########
+####### function for throw if pose invalud ##########
 
     def _throw_if_pose_invalid(self, pose: List[float]) -> None:
         """Throw error if given pose is not valid.
