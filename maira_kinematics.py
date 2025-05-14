@@ -490,10 +490,10 @@ def get_current_joint_state(self) -> List[float]:
         """
         solution = [] # creating an empty list of solution
         for i in range(100):
-            np.random.seed(i)
+            np.random.seed(i) # ensure each iteration produces the 
             dummy_array = (
                 reference_joint_states + np.random.randn(self.num_joints) * 1e-2
-            )
+            ) # multiplying the scale noise 
             try:
                 solution = self._robot.ik_fk(
                     "ik",
@@ -542,7 +542,7 @@ def get_current_joint_state(self) -> List[float]:
             [0.0, np.pi],
             [np.pi, 0.0],
             [np.pi, np.pi],
-        ]
+        ] # orientation in different axis 
         for retry_delta_angle_state in retry_delta_angle_states:
             seed_joint = deepcopy(reference_joint_states)
             seed_joint[5] = (
@@ -866,7 +866,7 @@ def get_current_joint_state(self) -> List[float]:
         RuntimeError
             Action failed
         """
-        self._throw_if_trajectory_invalid(trajectory) 
+        self._throw_if_trajectory_invalid(trajectory) # checking if the trajectory is valid or not 
 
         joint_property = {
             "target_joint": trajectory, # setting the target point
