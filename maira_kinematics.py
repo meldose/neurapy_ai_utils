@@ -84,21 +84,21 @@ class MairaKinematics(Node):
             JointState, 'joint_states', 10
         )
 
-        # Execution result publishers
+        # publishers
         self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
         self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
         self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
         self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
         self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
 
-        # Planning result publishers
+       # publishers
         self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
         self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
         self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
         self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
 
-        # Subscribers for execution APIs
+        # Subscribers 
         self.create_subscription(Pose, 'move_joint_to_cartesian', self._cb_move_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'move_joint_to_joint', self._cb_move_joint_to_joint, 10)
         self.create_subscription(Pose, 'move_linear', self._cb_move_linear, 10)
@@ -106,7 +106,7 @@ class MairaKinematics(Node):
         self.create_subscription(JointTrajectory, 'move_joint_via_points', self._cb_move_joint_via_points, 10)
         self.create_subscription(Int32MultiArray, 'execute_ids', self._cb_execute, 10)
 
-        # Subscribers for planning APIs
+        # Subscribers 
         self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self._cb_plan_motion_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'plan_motion_joint_to_joint', self._cb_plan_motion_joint_to_joint, 10)
         self.create_subscription(Pose, 'plan_motion_linear', self._cb_plan_motion_linear, 10)
