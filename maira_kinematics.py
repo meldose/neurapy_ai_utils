@@ -99,19 +99,19 @@ class MairaKinematics(Node):
         self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
 
         # Subscribers 
-        self.create_subscription(Pose, 'move_joint_to_cartesian', self._cb_move_joint_to_cartesian, 10)
-        self.create_subscription(JointState, 'move_joint_to_joint', self._cb_move_joint_to_joint, 10)
-        self.create_subscription(Pose, 'move_linear', self._cb_move_linear, 10)
-        self.create_subscription(PoseArray, 'move_linear_via_points', self._cb_move_linear_via_points, 10)
-        self.create_subscription(JointTrajectory, 'move_joint_via_points', self._cb_move_joint_via_points, 10)
-        self.create_subscription(Int32MultiArray, 'execute_ids', self._cb_execute, 10)
+        self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
+        self.create_subscription(JointState, 'move_joint_to_joint', self.move_joint_to_joint, 10)
+        self.create_subscription(Pose, 'move_linear', self.move_linear, 10)
+        self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10)
+        self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10)
+        self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
 
         # Subscribers 
-        self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self._cb_plan_motion_joint_to_cartesian, 10)
-        self.create_subscription(JointState, 'plan_motion_joint_to_joint', self._cb_plan_motion_joint_to_joint, 10)
-        self.create_subscription(Pose, 'plan_motion_linear', self._cb_plan_motion_linear, 10)
-        self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self._cb_plan_motion_linear_via_points, 10)
-        self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self._cb_plan_motion_joint_via_points, 10)
+        self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
+        self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_motion_joint_to_joint, 10)
+        self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
+        self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
+        self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_motion_joint_via_points, 10)
 
     def unified_pose_callback(self, msg: Pose, goal_pose: List[float]):
         goal_pose = [
@@ -666,7 +666,7 @@ class MairaKinematics(Node):
 
 ##### defining function for move joint to cartesian
 
-    def _cb_move_joint_to_cartesian(self, msg: Pose) -> None:
+    def move_joint_to_cartesian(self, msg: Pose) -> None:
         res = self.move_joint_to_cartesian([
             msg.position.x, msg.position.y, msg.position.z,
             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
@@ -674,12 +674,12 @@ class MairaKinematics(Node):
         self.pub_mjc_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_to_cartesian → {res}")
 
-    def _cb_move_joint_to_joint(self, msg: JointState) -> None:
+    def move_joint_to_joint(self, msg: JointState) -> None:
         res = self.move_joint_to_joint(msg.position)
         self.pub_mjj_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_to_joint → {res}")
 
-    def _cb_move_linear(self, msg: Pose) -> None:
+    def move_linear(self, msg: Pose) -> None:
         res = self.move_linear([
             msg.position.x, msg.position.y, msg.position.z,
             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
@@ -687,7 +687,7 @@ class MairaKinematics(Node):
         self.pub_ml_res.publish(Bool(data=res))
         self.get_logger().info(f"move_linear → {res}")
 
-    def _cb_move_linear_via_points(self, msg: PoseArray) -> None:
+    def move_linear_via_points(self, msg: PoseArray) -> None:
         poses = [
             [p.position.x, p.position.y, p.position.z,
              p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
@@ -697,20 +697,20 @@ class MairaKinematics(Node):
         self.pub_mlp_res.publish(Bool(data=res))
         self.get_logger().info(f"move_linear_via_points → {res}")
 
-    def _cb_move_joint_via_points(self, msg: JointTrajectory) -> None:
+    def move_joint_via_points(self, msg: JointTrajectory) -> None:
         traj = [pt.positions for pt in msg.points]
         res = self.move_joint_via_points(traj)
         self.pub_mjv_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_via_points → {res}")
 
-    def _cb_execute(self, msg: Int32MultiArray) -> None:
+    def execute(self, msg: Int32MultiArray) -> None:
         ids = list(msg.data)
         feas = [True] * len(ids)
         self.execute(ids, feas)
         self.get_logger().info(f"execute ids {ids}")
 
     # Planning callbacks
-    def _cb_plan_motion_joint_to_cartesian(self, msg: Pose) -> None:
+    def plan_motion_joint_to_cartesian(self, msg: Pose) -> None:
         ok, pid, last = self.plan_motion_joint_to_cartesian([
             msg.position.x, msg.position.y, msg.position.z,
             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
@@ -718,12 +718,12 @@ class MairaKinematics(Node):
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mjc.publish(String(data=payload))
 
-    def _cb_plan_motion_joint_to_joint(self, msg: JointState) -> None:
+    def plan_motion_joint_to_joint(self, msg: JointState) -> None:
         ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mjj.publish(String(data=payload))
 
-    def _cb_plan_motion_linear(self, msg: Pose) -> None:
+    def plan_motion_linear(self, msg: Pose) -> None:
         ok, pid, last = self.plan_motion_linear([
             msg.position.x, msg.position.y, msg.position.z,
             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
@@ -731,7 +731,7 @@ class MairaKinematics(Node):
         payload = f"{ok},{pid},{last}"
         self.pub_plan_ml.publish(String(data=payload))
 
-    def _cb_plan_motion_linear_via_points(self, msg: PoseArray) -> None:
+    def plan_motion_linear_via_points(self, msg: PoseArray) -> None:
         poses = [
             [p.position.x, p.position.y, p.position.z,
              p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
@@ -741,7 +741,7 @@ class MairaKinematics(Node):
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mlp.publish(String(data=payload))
 
-    def _cb_plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
+    def plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
         traj = [pt.positions for pt in msg.points]
         ok, pid, last = self.plan_motion_joint_via_points(traj)
         payload = f"{ok},{pid},{last}"
