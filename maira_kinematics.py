@@ -92,7 +92,7 @@ class MairaKinematics(Node):
         self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
 
        # publishers
-        self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
+        # self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
         self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
         self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
@@ -107,7 +107,7 @@ class MairaKinematics(Node):
         self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
 
         # Subscribers 
-        self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
+        # self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_motion_joint_to_joint, 10)
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
         self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
@@ -709,14 +709,14 @@ class MairaKinematics(Node):
         self.execute(ids, feas)
         self.get_logger().info(f"execute ids {ids}")
 
-    # Planning callbacks
-    def plan_motion_joint_to_cartesian(self, msg: Pose) -> None:
-        ok, pid, last = self.plan_motion_joint_to_cartesian([
-            msg.position.x, msg.position.y, msg.position.z,
-            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
-        ])
-        payload = f"{ok},{pid},{last}"
-        self.pub_plan_mjc.publish(String(data=payload))
+    # # Planning callbacks
+    # def plan_motion_joint_to_cartesian(self, msg: Pose) -> None:
+    #     ok, pid, last = self.plan_motion_joint_to_cartesian([
+    #         msg.position.x, msg.position.y, msg.position.z,
+    #         msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+    #     ])
+    #     payload = f"{ok},{pid},{last}"
+    #     self.pub_plan_mjc.publish(String(data=payload))
 
     def plan_motion_joint_to_joint(self, msg: JointState) -> None:
         ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
