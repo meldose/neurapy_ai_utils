@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>neurapy_ai_utils</name>
+    <version>0.7.0</version>
+    <description>
+        Utility package to access robot and end-effector operations.
+    </description>
+    <license>NEURA Robotics</license>
+    <maintainer email="atmaraaj.gopal@neura-robotics.com">Atmaraaj Gopal</maintainer>
+    <author>Atmaraaj Gopal</author>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>audio_common_msgs</exec_depend>
+    <exec_depend>neura_marker_detection_msgs</exec_depend>
+    <!-- <exec_depend>neurapy</exec_depend> -->
+    <exec_depend>neurapy_ai</exec_depend>
+    <exec_depend>rospy</exec_depend>
+    <exec_depend>sensor_msgs</exec_depend>
+    <exec_depend>sensor_msgs</exec_depend>
+    <exec_depend>tf</exec_depend>
+    <exec_depend>tf2_ros</exec_depend>
+
+</package>

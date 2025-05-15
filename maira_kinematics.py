@@ -19,6 +19,13 @@ from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 
 
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory
+from geometry_msgs.msg import Pose
+from rclpy.node import Node
+from typing import List
 
 class ThreadSafeCmdIDManager:
     """Thread safe implementation of CmdIDManager. This class has a thread lock
@@ -39,6 +46,7 @@ class ThreadSafeCmdIDManager:
         """
         self.id_manager_lock = threading.Lock() # setting the id_manager (locking the multiple threads)
         self.id_manager = id_manager if id_manager else CmdIDManager() # setting the id_manager else cmdID Manager.
+    
 
 
 # defining the function for updating the id ###########
@@ -58,7 +66,7 @@ class ThreadSafeCmdIDManager:
         return plan_id # return the plan_id or get the latest id
 
 
-class MairaKinematics(KinematicsInterface):
+class MairaKinematics(Node):
     """Access methods to plan and execute use the MAiRA control API.
 
     Parameters
@@ -80,7 +88,16 @@ class MairaKinematics(KinematicsInterface):
         require_elbow_up: bool = True,# setting the reuire elbow up
         id_manager: CmdIDManager = None, # setting the id manager
         robot_handler: Robot = None, # setting the robot handler 
+
     ):
+        super().__init__("maira_kinematics")
+        self.publisher_=self.create_publisher(Pose,'goal_cartesian_pose', 10)
+        time_period=2.0
+        self.timer=self.create_timer(time_period,self.publish_pose)
+        self.get_logger().info("Publisher started")
+
+
+    
         """Provide wrapped function for robot motion.
 
         Parameters
@@ -374,19 +391,19 @@ class MairaKinematics(KinematicsInterface):
     
 ##### defining function for getting the current joint state ###########
 
-def get_current_joint_state(self) -> List[float]:
-    """
-    Retrieves the current joint positions of the robot.
+    def get_current_joint_state(self) -> List[float]:
+        """
+        Retrieves the current joint positions of the robot.
 
-    Returns
-    -------
-    List[float]
-        A list of float values representing the current joint angles/positions.
-        These are typically expressed in radians or degrees, depending on the robot's configuration.
-    """
-    # Delegate the call to the internal method that interfaces with the robot hardware or simulator.
-    # This method abstracts the low-level details of reading joint states.
-    return self._get_current_joint_state()
+        Returns
+        -------
+        List[float]
+            A list of float values representing the current joint angles/positions.
+            These are typically expressed in radians or degrees, depending on the robot's configuration.
+        """
+        # Delegate the call to the internal method that interfaces with the robot hardware or simulator.
+        # This method abstracts the low-level details of reading joint states.
+        return self._get_current_joint_state()
 
 
 ##### function for getting the current cartesian tcp pose ##########
@@ -620,6 +637,22 @@ def get_current_joint_state(self) -> List[float]:
         speed: Optional[int] = None, # setting the speed
         acc: Optional[int] = None, # setting the acceleration
     ) -> bool:
+        
+        
+    def publish_pose(self):
+        msg = Pose()
+        msg.position.x = 0.4
+        msg.position.y = 0.0
+        msg.position.z = 0.3
+        msg.orientation.x = 0.0
+        msg.orientation.y = 0.0
+        msg.orientation.z = 0.0
+        msg.orientation.w = 1.0
+        self.publisher_.publish(msg)
+        self.get_logger().info("Published test goal pose.")
+
+        
+
         """Execute move joint action with given goal, speed and acceleration
 
         Parameters
@@ -648,6 +681,7 @@ def get_current_joint_state(self) -> List[float]:
         RuntimeError
             If action failed
         """
+
         self._throw_if_pose_invalid(goal_pose) # checking if the goalpose is valid or not 
 
         joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states) # converting the cartesian to joint 
@@ -1430,3 +1464,24 @@ def get_current_joint_state(self) -> List[float]:
         except Exception as ex:
             self._logger.error(f"Motion Id {plan_id} doesn't exist: {str(ex)}") # raise the Exception values 
             raise ex
+
+def main():
+    rclpy.init(args=args)
+    kinematics=MairaKinematics() # create the node
+    rclpy.spin(kinematics) # use the node 
+    kinematics.destroy_node() # stop the node 
+    rclpy.shutdown() # stop the node 
+
+    # kinematics.move_joint_to_cartesian()
+    # kinematics.move_joint_to_joint()
+    # kinematics.move_linear()
+    # kinematics.move_linear_via_points()
+    # kinematics.move_joint_via_points
+    # kinematics.plan_motion_joint_to_joint()
+    # kinematics.plan_motion_linear()
+    # kinematics.plan_motion_linear_via_points()
+    # kinematics.plan_motion_joint_via_points()
+    
+
+if __name__=="__main__":
+    main()
