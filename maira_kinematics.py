@@ -22,10 +22,14 @@ from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory
 from geometry_msgs.msg import Pose
+from trajectory_msgs.msg import JointTrajectory
 from rclpy.node import Node
 from typing import List, Optional, Union
+from std_msgs.msg import Float64MultiArray, Bool
+from neurapy.robot import Robot
+
+r=Robot()
 
 class ThreadSafeCmdIDManager:
     """Thread safe implementation of CmdIDManager. This class has a thread lock
@@ -77,25 +81,44 @@ class MairaKinematics(Node):
  #### intialise the elements ############
  
     def __init__(
-        self,
-        speed_move_joint: int = 20, # setting the move joint
-        speed_move_linear: float = 0.1,# setting the move linear
-        rot_speed_move_linear: float = 0.87266463, # setting the rotational speed move linear
-        acc_move_joint: int = 20, # setting the accelearion move joint 
-        acc_move_linear: float = 0.1,# setting the acc of move linear 
-        rot_acc_move_linear: float = 1.74532925,# setting the rotational acc move linear
-        blending_radius: float = 0.005,# setting the blending radius
-        require_elbow_up: bool = True,# setting the reuire elbow up
-        id_manager: CmdIDManager = None, # setting the id manager
-        robot_handler: Robot = None, # setting the robot handler 
+            self,
+            speed_move_joint: int = 20,
+            speed_move_linear: float = 0.1,
+            rot_speed_move_linear: float = 0.87266463,
+            acc_move_joint: int = 20,
+            acc_move_linear: float = 0.1,
+            rot_acc_move_linear: float = 1.74532925,
+            blending_radius: float = 0.005,
+            require_elbow_up: bool = True,
+            id_manager: CmdIDManager = None,
+            robot_handler: Robot = None,
+        ):
+            super().__init__("maira_kinematics")
 
-    ):
-        super().__init__("maira_kinematics")
+            self.speed_move_joint = speed_move_joint
+            self.acc_move_joint = acc_move_joint
+            self.require_elbow_up = require_elbow_up
 
-        self.create_subscription(Pose,"goal_cartesian_pose",self.goal_pose_callback,10)
-        self.create_subscription(Pose,"goal_joint_pose",self.joint_pose_callback,10)
-    
-    def goal_pose_callback(self,msg: Pose):
+            self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager)
+            self._robot = robot_handler if robot_handler else Robot()
+            self._robot_state = RobotStatus(self._robot)
+            self._program = Program(self._robot)
+
+            self.num_joints = self._robot.dof
+            if self.require_elbow_up:
+                self._elbow_checker = ElbowChecker(dof=self.num_joints, robot_name=self._robot.robot_name)
+
+            self._database_client = DatabaseClient()
+
+            # ROS2 interfaces
+
+            #subscriber
+            self.create_subscription(Pose, 'goal_cartesian_pose', self.goal_pose_callback, 10) 
+           
+            # publisher
+            self.joint_publish = self.create_publisher(JointState, '/joint_command_from_cartesian', 10) 
+
+    def goal_pose_callback(self, msg: Pose):
 
         goal_pose = [
             msg.position.x,
@@ -107,73 +130,51 @@ class MairaKinematics(Node):
             msg.orientation.w,
         ]
 
-        self.get_logger().info(f"Received goal pose: {goal_pose}")
-        speed = self.get_parameter('joint_speed').get_parameter_value().integer_value
-        acc = self.get_parameter('joint_acc').get_parameter_value().integer_value
+        joint_property = {
+            "target_joint": [goal_pose],
+            "speed": self.speed_move_joint,
+            "acceleration": self.acc_move_joint,
+            "interpolator": 1,
+            "enable_blending": True,
+        }
 
-        # You can optionally provide these via parameters or hardcode for now
-        reference_joint_states = None
-        speed = None
-        acc = None
+        plan_id = self._id_manager.update_id() if self._id_manager else 0
 
-    def joint_pose_callback(self,msg:Pose):
+        if self._program:
 
-        joint_pose=list(msg.data)
-    
-        """Provide wrapped function for robot motion.
-
-        Parameters
-        ----------
-        speed_move_joint: int, optional
-            Global joint speed for move joint in percentage. Defaults to 10.
-        speed_move_linear: float, optional
-            Global translation speed for move linear in m/sec. Defaults to 0.05.
-        rot_speed_move_linear: float, optional
-            Global linear speed of rotation for move linear in rad/sec. Defaults
-            to 0.87266463.
-        acc_move_joint: int, optional
-            Global joint acceleration for move joint in percentage. Defaults to
-            20.
-        acc_move_linear: float, optional
-            Global linear acceleration for move linear in m/sec2. Defaults to
-            0.1.
-        rot_acc_move_linear: float, optional
-            Global rotational acceleration for move linear. Defaults to
-            1.74532925.
-        blending_radius: float, optional
-            Global blending radius for blending linear motion, in m. Defaults to
-            0.005.
-        require_elbow_up: float, optional
-            Assert IK solutions with MAiRA's elbox (Axis 4) up, defaults to
-            True to return only elbow up solutions.
-        id_manager: CmdIDManager, optional
-            Pass an external neurapy.utils.CmdIDManager to manage planner IDs,
-            else a new CmdIDManager with a default start ID of 3e4 will used.
-        robot_handler: Robot, optional
-            Pass existing instance of neurapy.Robot, else a new instance is created
-        """
-        self._logger = init_logger(name=self.__class__.__name__)
-        self.speed_move_joint = speed_move_joint # setting up the speed move joint 
-        self.speed_move_linear = speed_move_linear # setting up the move linear 
-        self.rot_speed_move_linear = rot_speed_move_linear # setting up the rotation move linear  
-        self.acc_move_joint = acc_move_joint # setting up the acc move joint
-        self.acc_move_linear = acc_move_linear # setting up the acc move linear   
-        self.rot_acc_move_linear = rot_acc_move_linear # setting up the rotation acc move to linear
-        self.blending_radius = blending_radius # setting up the blending radius
-        self.require_elbow_up = require_elbow_up # setting up the reuire elbow up
-        self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager) # setting the command ID Manager 
-
-        self._robot = Robot() if not robot_handler else robot_handler # setting up the robot handler
-        self._robot_state = RobotStatus(self._robot) # getting the robot status 
-        self._program = Program(self._robot) # setting up the program 
-
-        self.num_joints = self._robot.dof
-        if require_elbow_up: # if the reuire elbow up is there:
-            self._elbow_checker = ElbowChecker(
-                dof=self.num_joints, robot_name=self._robot.robot_name
+            self._program.set_command(
+                cmd.Joint,
+                **joint_property,
+                cmd_id=plan_id,
+                current_joint_angles=self._get_current_joint_state(),
+                reusable_id=0,
             )
 
-        self._database_client = DatabaseClient() # setting the database client 
+            success = self._execute_if_successful(id=plan_id)
+            if success:
+                self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
+            else:
+                self.get_logger().warn(f"Execution failed for plan ID {plan_id}")
+                self.get_logger().info(f"Received goal pose: {goal_pose}")
+
+        if self._robot:
+
+            joint_positions = self._robot.solve_ik(goal_pose)  # hypothetical method
+
+            joint_state_msg = JointState()
+            joint_state_msg.header.stamp = self.get_clock().now().to_msg()
+            joint_state_msg.name = self._robot.get_joint_names()  # hypothetical method
+            joint_state_msg.position = joint_positions
+
+            self.joint_publish.publish(joint_state_msg)
+            self.get_logger().info(f"Published joint positions: {joint_positions}")
+        else:
+            self.get_logger().warn("No robot handler available to compute IK.")
+            
+    reference_joint_states = None
+    speed = None
+    acc = None
+
 
 # ###### Defining the function for changing the gripper #########
 
@@ -660,8 +661,6 @@ class MairaKinematics(Node):
         acc: Optional[int] = None, # setting the acceleration
     ) -> bool:
         
-
-
         """Execute move joint action with given goal, speed and acceleration
 
         Parameters
@@ -693,12 +692,9 @@ class MairaKinematics(Node):
 
         self._throw_if_pose_invalid(goal_pose) # checking if the goalpose is valid or not 
 
-        try:
-            joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states)
-            return self.move_joint_to_joint(joint_pose, speed, acc)
-        except Exception as e:
-            self.get_logger().error(f"Failed to move to Cartesian pose: {e}")
-            raise RuntimeError("Motion command failed") from e
+   
+        joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states)
+        return self.move_joint_to_joint(joint_pose, speed, acc)
 
 
 ### defining the function for moving joint to joint ############
