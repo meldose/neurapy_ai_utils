@@ -1,9 +1,12 @@
-import time # imoporting time module 
-from copy import deepcopy # importing copy module
-from typing import List, Optional, Tuple, Union # from typing import list, optional , Tuple and Union modules
-import threading #importing threading module 
+import threading
+from typing import List
 
-import numpy as np # importing numpy modules
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Bool, String, Int32MultiArray
+from sensor_msgs.msg import JointState, JointTrajectory
+from geometry_msgs.msg import Pose, PoseArray
+
 from neura_apps.gui_program.program import Program
 from neurapy.commands.state.robot_status import RobotStatus
 from neurapy.component import Component
@@ -13,114 +16,117 @@ from neurapy.utils import CmdIDManager
 from neurapy_ai.clients.database_client import DatabaseClient
 from neurapy_ai.utils.types import Pose, EndEffector
 from neurapy_ai_utils.functions.utils import init_logger
-from omniORB import CORBA # importing CORBA modules
+from omniORB import CORBA
 
 from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 
 
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Pose
-from trajectory_msgs.msg import JointTrajectory
-from rclpy.node import Node
-from typing import List, Optional, Union
-from std_msgs.msg import Float64MultiArray, Bool
-from neurapy.robot import Robot
-
-r=Robot()
-
 class ThreadSafeCmdIDManager:
-    """Thread safe implementation of CmdIDManager. This class has a thread lock
-    that ensures that only one process updates and read the ID at a time by
-    returning the updated id immediately on update, during which the update
-    method is locked.
-    """
-## initialise the elements ############
+    """Thread-safe wrapper around CmdIDManager."""
 
     def __init__(self, id_manager: CmdIDManager = None):
-        """Initialise optionally with an existing id manager
-        instance.
-
-        Parameters
-        ----------
-        id_manager : CmdIDManager
-            _description_
-        """
-        self.id_manager_lock = threading.Lock() # setting the id_manager (locking the multiple threads)
-        self.id_manager = id_manager if id_manager else CmdIDManager() # setting the id_manager else cmdID Manager.
-    
-
-
-# defining the function for updating the id ###########
+        self._lock = threading.Lock()
+        self._mgr = id_manager or CmdIDManager()
 
     def update_id(self) -> int:
-        """Update the command id by incrementing and return the updated id.
-
-        Returns
-        -------
-        int
-            Recently updated command id
         """
-        self.id_manager_lock.acquire() #  multiple threading program, lock prevent sone thread at a time 
-        self.id_manager.update_id() # id manager objects updates its ID counter
-        plan_id = self.id_manager.get_id() # gets the latest id 
-        self.id_manager_lock.release() # releaes the lock allows other threads 
-        return plan_id # return the plan_id or get the latest id
+        Atomically increment and return the new ID.
+        """
+        with self._lock:
+            return self._mgr.update_id()
 
 
 class MairaKinematics(Node):
-    """Access methods to plan and execute use the MAiRA control API.
+    """Access methods to plan and execute motions via the MAiRA control API."""
 
-    Parameters
-    ----------
-    KinematicsInterface : ABC
-        Interface with kinematic methods to define.
-    """
- #### intialise the elements ############
- 
     def __init__(
-            self,
-            speed_move_joint: int = 20,
-            speed_move_linear: float = 0.1,
-            rot_speed_move_linear: float = 0.87266463,
-            acc_move_joint: int = 20,
-            acc_move_linear: float = 0.1,
-            rot_acc_move_linear: float = 1.74532925,
-            blending_radius: float = 0.005,
-            require_elbow_up: bool = True,
-            id_manager: CmdIDManager = None,
-            robot_handler: Robot = None,
-        ):
-            super().__init__("maira_kinematics")
+        self,
+        speed_move_joint: int = 20,
+        speed_move_linear: float = 0.1,
+        rot_speed_move_linear: float = 0.87266463,
+        acc_move_joint: int = 20,
+        acc_move_linear: float = 0.1,
+        rot_acc_move_linear: float = 1.74532925,
+        blending_radius: float = 0.005,
+        require_elbow_up: bool = True,
+        id_manager: CmdIDManager = None,
+        robot_handler: Robot = None,
+    ):
+        super().__init__("maira_kinematics")
 
-            self.speed_move_joint = speed_move_joint
-            self.acc_move_joint = acc_move_joint
-            self.require_elbow_up = require_elbow_up
+        # Motion parameters
+        self.speed_move_joint = speed_move_joint
+        self.acc_move_joint = acc_move_joint
+        self.speed_move_linear = speed_move_linear
+        self.acc_move_linear = acc_move_linear
+        self.require_elbow_up = require_elbow_up
 
-            self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager)
-            self._robot = robot_handler if robot_handler else Robot()
-            self._robot_state = RobotStatus(self._robot)
-            self._program = Program(self._robot)
+        # Thread-safe command ID manager
+        self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager)
 
-            self.num_joints = self._robot.dof
-            if self.require_elbow_up:
-                self._elbow_checker = ElbowChecker(dof=self.num_joints, robot_name=self._robot.robot_name)
+        # Robot interface
+        self._robot = robot_handler or Robot()
+        self._robot_state = RobotStatus(self._robot)
+        self._program = Program(self._robot)
 
-            self._database_client = DatabaseClient()
+        self.num_joints = self._robot.dof
+        if self.require_elbow_up:
+            self._elbow_checker = ElbowChecker(
+                dof=self.num_joints,
+                robot_name=self._robot.robot_name,
+            )
 
-            # ROS2 interfaces
+        self._database_client = DatabaseClient()
 
-            #subscriber
-            self.create_subscription(Pose, 'goal_cartesian_pose', self.goal_pose_callback, 10) 
-           
-            # publisher
-            self.joint_publish = self.create_publisher(JointState, '/joint_command_from_cartesian', 10) 
+        # Publishers
+        self.joint_publish = self.create_publisher(
+            JointState, 'joint_states', 10
+        )
 
-    def goal_pose_callback(self, msg: Pose,goal_pose: List[List[float]]):
+        # Execution result publishers
+        self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
+        self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
+        self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
+        self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
+        self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
 
-        
+        # Planning result publishers
+        self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
+        self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
+        self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
+        self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
+        self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
+
+        # Subscribers for execution APIs
+        self.create_subscription(Pose, 'move_joint_to_cartesian', self._cb_move_joint_to_cartesian, 10)
+        self.create_subscription(JointState, 'move_joint_to_joint', self._cb_move_joint_to_joint, 10)
+        self.create_subscription(Pose, 'move_linear', self._cb_move_linear, 10)
+        self.create_subscription(PoseArray, 'move_linear_via_points', self._cb_move_linear_via_points, 10)
+        self.create_subscription(JointTrajectory, 'move_joint_via_points', self._cb_move_joint_via_points, 10)
+        self.create_subscription(Int32MultiArray, 'execute_ids', self._cb_execute, 10)
+
+        # Subscribers for planning APIs
+        self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self._cb_plan_motion_joint_to_cartesian, 10)
+        self.create_subscription(JointState, 'plan_motion_joint_to_joint', self._cb_plan_motion_joint_to_joint, 10)
+        self.create_subscription(Pose, 'plan_motion_linear', self._cb_plan_motion_linear, 10)
+        self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self._cb_plan_motion_linear_via_points, 10)
+        self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self._cb_plan_motion_joint_via_points, 10)
+
+    def unified_pose_callback(self, msg: Pose, goal_pose: List[float]):
+        goal_pose = [
+            msg.position.x,
+            msg.position.y,
+            msg.position.z,
+            msg.orientation.x,
+            msg.orientation.y,
+            msg.orientation.z,
+            msg.orientation.w,
+        ]
+
+        self.goal_pose_callback(msg)
+        self.linear_pose_callback(msg)
+
         joint_property = {
             "target_joint": [goal_pose],
             "speed": self.speed_move_joint,
@@ -130,25 +136,16 @@ class MairaKinematics(Node):
         }
 
         linear_property = {
-            "target_pose": [self._get_current_cartesian_pose(), goal_pose], # setting the target pose
-            "speed": self.speed_move_linear , # setting the speed
-            "acceleration": self.acc_move_linear , # setting the acceleration
-            "blending": False, # setting the blending 
-            "blend_radius": 0.0, # setting the blend radius
+            "target_pose": [self._get_current_cartesian_pose(), goal_pose],
+            "speed": self.speed_move_linear,
+            "acceleration": self.acc_move_linear,
+            "blending": False,
+            "blend_radius": 0.0,
         }
 
-        linear_property = {
-            "target_pose": [self.start_cartesian_pose, goal_pose],# setting up the target pose
-            "speed": self.speed_move_linear ,# setting up the speed
-            "acceleration": self.acc_move_linear ,# setting up the acceleration
-            "blending": False,# setting up the blending 
-            "blend_radius": 0.0, # setting up the blend radius 
-        }
-        
         plan_id = self._id_manager.update_id() if self._id_manager else 0
 
         if self._program:
-
             self._program.set_command(
                 cmd.Joint,
                 **joint_property,
@@ -166,27 +163,27 @@ class MairaKinematics(Node):
             )
 
             success = self._execute_if_successful(id=plan_id)
-            
+
             if success:
                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
             else:
-                self.get_logger().warn(f"Execution failed for plan ID {plan_id}")
-                self.get_logger().info(f"Received goal pose: {goal_pose}")
+                self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
 
         if self._robot:
-
-            joint_positions = self._robot.solve_ik(goal_pose)  # hypothetical method
-
-            joint_state_msg = JointState()
-            joint_state_msg.header.stamp = self.get_clock().now().to_msg()
-            joint_state_msg.name = self._robot.get_joint_names()  # hypothetical method
-            joint_state_msg.position = joint_positions
-
-            self.joint_publish.publish(joint_state_msg)
-            self.get_logger().info(f"Published joint positions: {joint_positions}")
+            joint_positions = self._robot.solve_ik(goal_pose)
+            if joint_positions is not None:
+                joint_state_msg = JointState()
+                joint_state_msg.header.stamp = self.get_clock().now().to_msg()
+                joint_state_msg.name = self._robot.get_joint_names()
+                joint_state_msg.position = joint_positions
+                self.joint_publish.publish(joint_state_msg)
+                self.get_logger().info(f"Published joint positions: {joint_positions}")
+            else:
+                self.get_logger().warn("IK solution not found for given pose.")
         else:
-            self.get_logger().warn("No robot handler available to compute IK.")
-            
+            self.get_logger().warn("No robot handler available.")
+
+                
     reference_joint_states = None
     speed = None
     acc = None
@@ -669,843 +666,97 @@ class MairaKinematics(Node):
 
 ##### defining function for move joint to cartesian
 
-    def move_joint_to_cartesian(
-        self,
-        goal_pose: List[float], # setting the goal_pose 
-        reference_joint_states: Union[List[float], None] = None, # setting the joint states
-        speed: Optional[int] = None, # setting the speed
-        acc: Optional[int] = None, # setting the acceleration
-    ) -> bool:
-        
-        """Execute move joint action with given goal, speed and acceleration
+    def _cb_move_joint_to_cartesian(self, msg: Pose) -> None:
+        res = self.move_joint_to_cartesian([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        self.pub_mjc_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_joint_to_cartesian → {res}")
 
-        Parameters
-        ----------
-        goal_pose: list[float]
-            TCP goal pose in cartesian as a list
-        reference_joint_states: Union[List[float],None]
-            Reference joint states to seed the IK solution for the given pose.
-            Defaults to None, to use the current joint positions.
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
+    def _cb_move_joint_to_joint(self, msg: JointState) -> None:
+        res = self.move_joint_to_joint(msg.position)
+        self.pub_mjj_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_joint_to_joint → {res}")
 
-        Returns
-        -------
-        bool
-            Move command success
+    def _cb_move_linear(self, msg: Pose) -> None:
+        res = self.move_linear([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        self.pub_ml_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_linear → {res}")
 
-        Raises
-        ------
-        TypeError
-            If get wrong input type
-        RuntimeError
-            If action failed
-        """
-
-        self._throw_if_pose_invalid(goal_pose) # checking if the goalpose is valid or not 
-
-   
-        joint_pose = self.cartesian_2_joint(goal_pose, reference_joint_states)
-        return self.move_joint_to_joint(joint_pose, speed, acc)
-
-
-### defining the function for moving joint to joint ############
-
-    def move_joint_to_joint(
-        self,
-        goal_pose: List[float], # setting the goal pose 
-        speed: Optional[int] = None, # setting the speed for the movement 
-        acc: Optional[int] = None, # setting the acceleration for the robot movement 
-    ) -> bool: 
-        """Execute move joint action with given goal, speed and acceleration
-
-        Parameters
-        ----------
-        goal_pose: list[float]
-            Goal joint positions
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
-
-        Returns
-        -------
-        bool
-            Move command success
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Action failed
-        """
-        self._throw_if_joint_invalid(goal_pose)
-
-        joint_property = {
-            "target_joint": [goal_pose],
-            "speed": self.speed_move_joint if speed is None else speed,
-            "acceleration": self.acc_move_joint if acc is None else acc,
-            "interpolator": 1,
-            "enable_blending": True,
-        }
-
-        plan_id = self._id_manager.update_id()
-        self._program.set_command(
-            cmd.Joint,
-            **joint_property,
-            cmd_id=plan_id,
-            current_joint_angles=self._get_current_joint_state(),
-            reusable_id=0,
-        )
-        return self._execute_if_successful(id=plan_id)
-
-
-########## defining function for move_linear ##############
-
-    def move_linear(
-        self,
-        goal_pose: List[float],
-        speed: Optional[float] = None,
-        acc: Optional[float] = None,
-        rot_speed: Optional[float] = None,
-        rot_acc: Optional[float] = None,
-    ) -> bool:
-        """Execute move linear action with given goal, speed and acceleration
-
-        Parameters
-        ----------
-        goal_pose: list
-            TCP goal pose in cartesian as a list
-        speed: Optional[float], optional
-            Translation speed in m/sec. Defaults to None, to use the class'
-            default value.
-        acc: Optional[float], optional
-            Translation acceleration in m2/sec. Defaults to None, to use the
-            class' default value.
-        rot_speed: Optional[float], optional
-            Rotation speed in rad/sec. Defaults to None, to use the class'
-            default value.
-        rot_acc: Optional[float], optional
-            Rotation acceleration in rad/sec2. Defaults to None, to use the
-            class' default value.
-
-        Returns
-        -------
-        bool
-            Move command success
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Action failed
-        """
-        self._throw_if_pose_invalid(goal_pose) # To check if the goal pose is valid or not 
-        linear_property = {
-            "target_pose": [self._get_current_cartesian_pose(), goal_pose], # setting the target pose
-            "speed": self.speed_move_linear if speed is None else speed, # setting the speed
-            "acceleration": self.acc_move_linear if acc is None else acc, # setting the acceleration
-            "blending": False, # setting the blending 
-            "blend_radius": 0.0, # setting the blend radius
-        }
-        plan_id = self._id_manager.update_id() # updating the id value 
-        self._program.set_command(
-            cmd.Linear,
-            **linear_property,
-            cmd_id=plan_id,
-            current_joint_angles=self._get_current_joint_state(),
-            reusable_id=0,
-        )
-        return self._execute_if_successful(id=plan_id)
-
-## defining function for move linear through point s##########
-
-    def move_linear_via_points(
-        self,
-        goal_poses: List[List[float]], # setting the  poses
-        speed: Optional[float] = None,# setting the  speed
-        acc: Optional[float] = None,# setting the acc
-        rot_speed: Optional[float] = None,# setting the  rot speed
-        rot_acc: Optional[float] = None,# setting the rot_acc
-        blending_radius: Optional[float] = None,# setting the blending radius
-    ) -> bool:
-        """Execute move linear via points action with given goal, speed and
-        acceleration
-
-        Parameters
-        ----------
-        goal_poses: list
-            TCP goal cartesian poses list
-        speed: Optional[float], optional
-            Translation speed in m/sec. Defaults to None, to use the class'
-            default value.
-        acc: Optional[float], optional
-            Translation acceleration in m/sec2. Defaults to None, to use the
-            class' default value.
-        rot_speed : Optional[float], optional
-            Rotational speed in rad/sec. Defaults to None, to use the
-            class' default value.
-        rot_acc : Optional[float], optional
-            Rotational acceleration in rad/sec2. Defaults to None, to use the
-            class' default value.
-        blending_radius : Optional[float], optional
-            Blending radius in m. Defaults to None, to use the
-            class' default value.
-
-        Returns
-        -------
-        bool
-            Move command success
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Action failed
-        """
-        self._throw_if_list_poses_invalid(goal_poses) # checking if the robot move to the correct goal pose or not 
-
-        goal_poses.insert(0, self._get_current_cartesian_pose())
-        linear_property = {
-            "target_pose": goal_poses, # setting up the target poses
-            "speed": self.speed_move_linear if speed is None else speed, # setting the speed
-            "acceleration": self.acc_move_linear if acc is None else acc, # setting the acceleration
-            "blend_radius": (
-                0.01 if (blending_radius is None) else blending_radius # defining the blend radius
-            ),
-        }
-        plan_id = self._id_manager.update_id() # updating the id 
-        self._program.set_command(
-            cmd.Linear,
-            **linear_property,
-            cmd_id=plan_id,
-            current_joint_angles=plan_id,
-            reusable_id=0,
-        )
-        return self._execute_if_successful(id=plan_id) # return the execution if successful 
-    
-### defining function for moving joint via points #########
-
-    def move_joint_via_points(
-        self,
-        trajectory: List[List[float]],
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-    ) -> bool:
-        """
-        Execute move joint via points action with given joint trajectory, speed
-        and acceleration
-
-        THIS WILL NOT BE A BLEND MOVEMENT AS NEURAPY DO NOT SUPPORT IT YET FOR
-        JOINT INTERPOLATION!
-
-        Parameters
-        ----------
-        trajectory : List[List[float]]
-            Joint trajectory
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
-
-        Returns
-        -------
-        bool
-            Move command success
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Action failed
-        """
-        self._throw_if_trajectory_invalid(trajectory) # checking if the trajectory is valid or not 
-
-        joint_property = {
-            "target_joint": trajectory, # setting the target point
-            "speed": self.speed_move_joint if speed is None else speed,# setting the speed
-            "acceleration": self.acc_move_joint if acc is None else acc,# setting the accelration
-            "interpolator": 1,# setting the interpolator
-            "enable_blending": True,# setting the enable blending 
-        }
-        plan_id = self._id_manager.update_id() # setting up the plan_id 
-        self._program.set_command(
-            cmd.Joint,
-            **joint_property,
-            cmd_id=plan_id,
-            current_joint_angles=self._get_current_joint_state(),
-            reusable_id=0,
-        )
-        return self._execute_if_successful(id=plan_id)
-
-
-## defining function for executing motion for ids  #######
-
-    def execute(self, ids: List[int], execution_feasibilities: List[bool]):
-        """Execute the motion for given id when the plan is succeed.
-
-        Parameters
-        ----------
-        ids : List[int]
-            A list of id of the planned motion to be executed
-        execution_feasibilities : List[bool]
-            A List of flag indicate the execution feasibility, false will be jumped over
-
-        """
-        self._logger.debug(
-            "MairaKinematics: Execute: execution_feasibility"
-            + str(execution_feasibilities)
-            + "ID: "
-            + str(ids)
-        )
-        executable_ids = [
-            id
-            for id, execution_feasibility in zip(ids, execution_feasibilities)
-            if execution_feasibility == True
+    def _cb_move_linear_via_points(self, msg: PoseArray) -> None:
+        poses = [
+            [p.position.x, p.position.y, p.position.z,
+             p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
+            for p in msg.poses
         ]
-        self._logger.info(f"Executable ids: {executable_ids}")
-        self._program.execute(executable_ids)
+        res = self.move_linear_via_points(poses)
+        self.pub_mlp_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_linear_via_points → {res}")
+
+    def _cb_move_joint_via_points(self, msg: JointTrajectory) -> None:
+        traj = [pt.positions for pt in msg.points]
+        res = self.move_joint_via_points(traj)
+        self.pub_mjv_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_joint_via_points → {res}")
+
+    def _cb_execute(self, msg: Int32MultiArray) -> None:
+        ids = list(msg.data)
+        feas = [True] * len(ids)
+        self.execute(ids, feas)
+        self.get_logger().info(f"execute ids {ids}")
+
+    # Planning callbacks
+    def _cb_plan_motion_joint_to_cartesian(self, msg: Pose) -> None:
+        ok, pid, last = self.plan_motion_joint_to_cartesian([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        payload = f"{ok},{pid},{last}"
+        self.pub_plan_mjc.publish(String(data=payload))
+
+    def _cb_plan_motion_joint_to_joint(self, msg: JointState) -> None:
+        ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
+        payload = f"{ok},{pid},{last}"
+        self.pub_plan_mjj.publish(String(data=payload))
+
+    def _cb_plan_motion_linear(self, msg: Pose) -> None:
+        ok, pid, last = self.plan_motion_linear([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        payload = f"{ok},{pid},{last}"
+        self.pub_plan_ml.publish(String(data=payload))
+
+    def _cb_plan_motion_linear_via_points(self, msg: PoseArray) -> None:
+        poses = [
+            [p.position.x, p.position.y, p.position.z,
+             p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
+            for p in msg.poses
+        ]
+        ok, pid, last = self.plan_motion_linear_via_points(poses)
+        payload = f"{ok},{pid},{last}"
+        self.pub_plan_mlp.publish(String(data=payload))
+
+    def _cb_plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
+        traj = [pt.positions for pt in msg.points]
+        ok, pid, last = self.plan_motion_joint_via_points(traj)
+        payload = f"{ok},{pid},{last}"
+        self.pub_plan_mjv.publish(String(data=payload))
 
-###### defining the function for motion plan to cartesian ############
-
-    def plan_motion_joint_to_cartesian(
-        self,
-        goal_pose,
-        reference_joint_states: Union[List[float], None] = None, # setting the reference joint states
-        start_joint_states: Union[List[float], None] = None, # setting the joint states
-        speed: Optional[int] = None,  # defining the speed
-        acc: Optional[int] = None, # defining the acc
-        reusable: Optional[bool] = False, # defining the reusable 
-    ) -> Tuple[bool, int, List[float]]:
-        """Plan motion for move joint action with given goal, speed and acceleration
-
-        Parameters
-        ----------
-        goal_pose: list
-            TCP goal pose in cartesian as a list
-        reference_joint_states: Union[List[float],None]
-            Reference joint states to seed the IK solution for the given pose.
-            Defaults to None, to use the current joint positions.
-        start_joint_states: Union[List[float],None]
-            Start joint states. Defaults to None, to use the current joint
-            positions.
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
-        reusable: Optional[bool], optional
-            Reuse the planned ID for repeated executions. Defaults to False,
-            the plan will be executable only once.
-
-        Returns
-        -------
-        Tuple[Tuple[bool,bool], int, List[float]]
-            Tuple consisting of (plan success, plan feasibility), result plan ID
-            that points to planned trajectory, last joint positions in the
-            result trajectory.
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Planning failed
-        """
-        if start_joint_states is None: # if the start joint states is None 
-            start_joint_states = self._get_current_joint_state() # setting the joint states with the current joint states
-
-        self._throw_if_pose_invalid(goal_pose)
-        self._throw_if_joint_invalid(start_joint_states)
-
-        try:  
-            joint_pose = self.cartesian_2_joint(
-                goal_pose, reference_joint_states
-            )
-        except ValueError as e: # raise an exception value Error 
-            self._logger.error(e)
-            return False, None, []
-
-        return self.plan_motion_joint_to_joint( 
-            goal_pose=joint_pose,
-            start_joint_states=start_joint_states,
-            speed=speed,
-            acc=acc,
-            reusable=reusable,
-        ) # returning the function
-        
-### defining function for motion from joint to joint ######
-
-    def plan_motion_joint_to_joint(
-        self,
-        goal_pose: List[float], # setting up the goal pose 
-        start_joint_states: Union[List[float], None] = None, # setting up the start join states 
-        speed: Optional[int] = None, # setting up the speed
-        acc: Optional[int] = None, # setting up the acc
-        reusable: Optional[bool] = False, # setting up the reusable 
-    ) -> Tuple[Tuple[bool, bool], int, List[float]]:
-        """Plan motion for move joint action with given goal, speed and
-        acceleration.
-
-        Parameters
-        ----------
-        goal_pose: list[float]
-            Goal joint positions
-        start_joint_states: Union[List[float],None]
-            Start joint states. Defaults to None, to use the current joint
-            positions.
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
-        reusable: Optional[bool], optional
-            Reuse the planned ID for repeated executions. Defaults to False,
-            the plan will be executable only once.
-
-        Returns
-        -------
-        Tuple[Tuple[bool,bool], int, List[float]]
-            Tuple consisting of (plan success, plan feasibility), result plan ID
-            that points to planned trajectory, last joint positions in the
-            result trajectory.
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Planning failed
-        """
-
-        if start_joint_states is None: # if the start joint states is None 
-            start_joint_states = self._get_current_joint_state() # getting the current joint states
-
-        self._throw_if_joint_invalid(goal_pose) # checking if the goal pose is valid or not 
-        self._throw_if_joint_invalid(start_joint_states)# checking if the joint states is valid or not 
-
-        if start_joint_states is None: # if the stat joint states is None then 
-            start_joint_states = self._get_current_joint_state() # getting the current joint states 
-
-        joint_property = {
-            "target_joint": [goal_pose],
-            "speed": self.speed_move_joint if speed is None else speed,
-            "acceleration": self.acc_move_joint if acc is None else acc,
-            "interpolator": 1,
-            "enable_blending": True,
-        } # defining the join propert dictionary
-
-        plan_id = self._id_manager.update_id() # update the id 
-        self._program.set_command(
-            cmd.Joint,
-            **joint_property,
-            cmd_id=plan_id,
-            current_joint_angles=start_joint_states,
-            reusable_id=1 if reusable else 0,
-        )
-        success_flags = self._is_id_successful(plan_id) # setting the success flage for checking if the lates id is successful or not 
-        last_joint_state = None
-        if all(success_flags): # if the all the success flags are there then
-            last_joint_state = self._program.get_last_joint_configuration(
-                plan_id
-            ) # setting the last joint state
-        return (
-            success_flags,
-            plan_id,
-            last_joint_state,
-        ) # returning the success flags, plan_id and last joint state
-
-
-#### defining function for motion linear #######
-
-    def plan_motion_linear(
-        self,
-        goal_pose: List[float], # setting up the goal pose 
-        start_cartesian_pose: Union[List[float], None] = None, # setting up the cartesian pose  
-        start_joint_states: Union[List[float], None] = None, # setting up the  start joint states 
-        speed: Optional[float] = None, # setting up the speed
-        acc: Optional[float] = None, # setting up the acc
-        reusable: Optional[bool] = False, # setting up the reusable    
-    ) -> Tuple[Tuple[bool, bool], int, List[float]]:
-        """Plan motion for move linear action with given goal, speed and
-        acceleration.
-
-        Parameters
-        ----------
-        goal_pose: List[float]
-            TCP goal cartesian pose as list
-        start_cartesian_pose: Union[List[float],None]
-            Start tcp cartesian pose relative to the base frame. Defaults to
-            None, to use the current tcp pose.
-        start_joint_states: Union[List[float],None]
-            Start joint states. Defaults to None, to use the current joint
-            positions.
-        speed: Optional[float], optional
-            Translation speed in m/sec. Defaults to None, to use the class'
-            default value.
-        acc: Optional[float], optional
-            Translation acceleration in m2/sec. Defaults to None, to use the
-            class' default value.
-        reusable : Optional[bool], optional
-            Reuse the planned ID for repeated executions. Defaults to False, the
-            plan will be executable only once.
-
-        Returns
-        -------
-        Tuple[Tuple[bool, bool], int, List[float]]
-            Tuple consisting of (plan success, plan feasibility), result plan ID
-            that points to planned trajectory, last joint positions in the
-            result trajectory.
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Planning failed
-
-        """
-
-        if not all([start_cartesian_pose, start_joint_states]): # checking start cartesian pose and start joint states
-            # Set start state to current pose only if neither of
-            # start pose nor start joint state are set
-            start_cartesian_pose = self._get_current_cartesian_pose() # getting the current cartesian pose 
-            start_joint_states = self._get_current_joint_state() # getting the current joint state
-
-        self._throw_if_pose_invalid(goal_pose) # checking if the goal pose is valid or not 
-        self._throw_if_pose_invalid(start_cartesian_pose) # checking if the cartesian pose  is valid or not 
-        self._throw_if_joint_invalid(start_joint_states)# checking if the  is joint states is  valid or not 
-
-        linear_property = {
-            "target_pose": [start_cartesian_pose, goal_pose],# setting up the target pose
-            "speed": self.speed_move_linear if speed is None else speed,# setting up the speed
-            "acceleration": self.acc_move_linear if acc is None else acc,# setting up the acceleration
-            "blending": False,# setting up the blending 
-            "blend_radius": 0.0, # setting up the blend radius 
-        }
-        plan_id = self._id_manager.update_id() # updating the plan id 
-        self._program.set_command(
-            cmd.Linear,
-            **linear_property,
-            cmd_id=plan_id,
-            current_joint_angles=start_joint_states,
-            reusable_id=1 if reusable else 0,
-        )
-        success_flags = self._is_id_successful(plan_id) # setting up the success flags 
-        last_joint_state = None # setting up  the latest joint states as None
-        if all(success_flags):
-            last_joint_state = self._program.get_last_joint_configuration(
-                plan_id
-            )
-        return (
-            
-            success_flags,
-            plan_id,
-            last_joint_state,
-        )
-
-#### defining function for plan motion through points########
-
-    def plan_motion_linear_via_points(
-        self,
-        goal_poses: List[List[float]],
-        start_cartesian_pose: Union[List[float], None] = None,
-        start_joint_states: Union[List[float], None] = None,
-        speed: Optional[float] = None,
-        acc: Optional[float] = None,
-        rot_speed: Optional[float] = None,
-        rot_acc: Optional[float] = None,
-        blending_radius: Optional[float] = None,
-        reusable: Optional[bool] = False,
-    ) -> Tuple[Tuple[bool, bool], int, List[float]]:
-        """Plan motion for move linear via points action with given goal, speed
-        and acceleration.
-
-        Parameters
-        ----------
-        goal_poses: list
-            TCP goal cartesian poses list
-        start_cartesian_pose: Union[List[float],None]
-            Start tcp cartesian pose relative to the base frame. Defaults to
-            None, to use the current tcp pose.
-        start_joint_states: Union[List[float],None]
-            Start joint states. Defaults to None, to use the current joint
-            positions.
-        speed: Optional[float], optional
-            Translation speed in m/sec. Defaults to None, to use the class'
-            default value.
-        acc: Optional[float], optional
-            Translation acceleration in m/sec2. Defaults to None, to use the
-            class' default value.
-        rot_speed : Optional[float], optional
-            Rotational speed in rad/sec. Defaults to None, to use the
-            class' default value.
-        rot_acc : Optional[float], optional
-            Rotational acceleration in rad/sec2. Defaults to None, to use the
-            class' default value.
-        blending_radius : Optional[float], optional
-            Blending radius in m. Defaults to None, to use the
-            class' default value.
-        reusable : Optional[bool], optional
-            Reuse the planned ID for repeated executions. Defaults to False, the
-            plan will be executable only once.
-
-        Returns
-        -------
-        Tuple[Tuple[bool, bool], int, List[float]]
-            Tuple consisting of (plan success, plan feasibility), result plan ID
-            that points to planned trajectory, last joint positions in the
-            result trajectory.
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Planning failed
-
-        """
-        if not all([start_cartesian_pose, start_joint_states]): # checking if the it is start cartesian posea and start joint states
-            # Set start state to current pose only if neither of
-            # start pose nor start joint state are set
-            start_cartesian_pose = self._get_current_cartesian_pose() # getting the current the cartesian poses
-            start_joint_states = self._get_current_joint_state() # getting the current joint state 
-
-        self._throw_if_list_poses_invalid(goal_poses) # checking if the goal pose is valid or not 
-        self._throw_if_pose_invalid(start_cartesian_pose)  # checking if the cartesian pose  is valid or not 
-        self._throw_if_joint_invalid(start_joint_states) # checking if the  is joint states is  valid or not 
-
-        goal_poses.insert(0, self._get_current_cartesian_pose())
-        linear_property = {
-            "target_pose": goal_poses,
-            "speed": self.speed_move_linear if speed is None else speed,
-            "acceleration": self.acc_move_linear if acc is None else acc,
-            "blend_radius": (
-                0.01 if (blending_radius is None) else blending_radius
-            ),
-        }
-
-        plan_id = self._id_manager.update_id() # setting up the plan_id 
-        self._program.set_command(
-            cmd.Linear,
-            **linear_property,
-            cmd_id=plan_id,
-            current_joint_angles=start_joint_states,
-            reusable_id=1 if reusable else 0,
-        )
-        success_flags = self._is_id_successful(plan_id) # setting up the success flags # 
-        last_joint_state = None
-        if all(success_flags):
-            last_joint_state = self._program.get_last_joint_configuration(
-                plan_id
-            )
-        return (
-            success_flags,
-            plan_id,
-            last_joint_state,
-        )
-        
-## defining function for planning motion through points########
-
-    def plan_motion_joint_via_points(
-        self,
-        trajectory: List[List[float]], # setting up the trajectory 
-        start_joint_states: Union[List[float], None] = None, # setting up the joint states 
-        speed: Optional[int] = None, # setting up the speed
-        acc: Optional[int] = None, # setting up the acc
-        reusable: Optional[bool] = False, # setting up the reusable 
-    ) -> Tuple[Tuple[bool, bool], int, List[float]]:
-        """
-        Plan motion for move joint via points action with given joint
-        trajectory, speed and acceleration.
-
-        THIS WILL NOT BE A BLEND MOVEMENT AS NEURAPY DO NOT SUPPORT IT YET FOR
-        JOINT INTERPOLATION!
-
-        Parameters
-        ----------
-        trajectory : List[List[float]]
-            Joint trajectory
-        start_joint_states: Union[List[float],None]
-            Start joint states. Defaults to None, to use the current joint
-            positions.
-        speed: Optional[int], optional
-            Joint speed as percentage value [0, 100]. Defaults to None, to use
-            the class' default value.
-        acc: Optional[int], optional
-            Joint acceleration as percentage value [0, 100]. Defaults to None,
-            to use the class' default value.
-        reusable: Optional[bool], optional
-            Reuse the planned ID for repeated executions. Defaults to False,
-            the plan will be executable only once.
-
-        Returns
-        -------
-        Tuple[Tuple[bool,bool], int, List[float]]
-            Tuple consisting of (plan success, plan feasibility), result plan ID
-            that points to planned trajectory, last joint positions in the
-            result trajectory.
-
-        Raises
-        ------
-        TypeError
-            Wrong input type
-        RuntimeError
-            Planning failed
-        """
-        if start_joint_states is None: # if the start joint state is None 
-            start_joint_states = self._get_current_joint_state() # getting the current joint state
-
-        self._throw_if_trajectory_invalid(trajectory) # checking if the trajectory is valid or not 
-        self._throw_if_joint_invalid(start_joint_states)# checking if the joint states is valid or not 
-
-        joint_property = {
-            "target_joint": trajectory,
-            "speed": self.speed_move_joint if speed is None else speed,
-            "acceleration": self.acc_move_joint if acc is None else acc,
-            "interpolator": 1,
-            "enable_blending": True,
-        } # creating an dictionary for joint property
-        plan_id = self._id_manager.update_id() # updating the plan id 
-        self._program.set_command(
-            cmd.Joint,
-            **joint_property,
-            cmd_id=plan_id,
-            current_joint_angles=start_joint_states,
-            reusable_id=1 if reusable else 0,
-        )
-        success_flags = self._is_id_successful(plan_id) # setting up the success flags
-        last_joint_state = None
-        if all(success_flags): # setting up the success flags
-            last_joint_state = self._program.get_last_joint_configuration(
-                plan_id
-            )
-        return (
-            success_flags,
-            plan_id,
-            last_joint_state,
-        ) # returning the success flags, plan_id , latest joint states 
-
-
-
-############# END ###################################################
-
-
-
-
-
-
-#### defining function for clearign the ids ############
-
-    def clear_ids(self, ids: List[int]) -> bool: 
-        """Clear given plan IDs from memory stack to prevent overload.
-
-        Parameters
-        ----------
-        ids : List[int]
-            Plan IDs
-
-        Returns
-        -------
-        bool
-            Clearing success
-
-        """
-        # Initialize the RTS component for interacting with the robot's real-time system
-        rts = Component(self._robot, "RTS")
-
-        # Wrap the list of IDs in a CORBA-compatible DoubleSeq type
-        corba_cmd_id = CORBA.Any(
-            CORBA.TypeCode("IDL:omg.org/CORBA/DoubleSeq:1.0"), ids
-        )
-
-        # Call the 'clearSplineId' service on the RTS component and check if it succeeded (return value 0 indicates success)
-        success = rts.callService("clearSplineId", [corba_cmd_id]) == 0
-
-        # If the service call failed, log a warning with the list of IDs that could not be deleted
-        if not success:
-            self._logger.warning(f"Fail to delete ids {ids}")
-
-        # Return the result of the operation (True if successful, False otherwise)
-        return success
-
-    
-#### defining the function for checking the id is succesfull or not #############
-
-    def _is_id_successful(
-        self, plan_id: int, timeout: float = 10.0
-    ) -> Tuple[bool, bool]:
-        """Check if planning for given id is successful.
-
-        Parameters
-        ----------
-        plan_id : int
-            Plan ID to check.
-        timeout : float, optional
-            Timeout to check for plan success in sec, by default 10.0
-
-        Returns
-        -------
-        Tuple[bool, bool]
-            Tuple of flags for plan success and execution feasibility
-
-        Raises
-        ------
-        Exception
-            Given ID does not exist.
-
-        """
-        try:
-            t_start = time.time() # setting the start time  
-            status = self._program.get_plan_status(plan_id) # setting the status 
-            while (
-                status != calculation.Failed # if the status is not Failed 
-                and status != calculation.Success # if the status si not success
-                and (time.time() - t_start) < timeout # checking if the time is less than the actual timeout 
-            ):
-                time.sleep(0.01) # setting up the time sleep
-                status = self._program.get_plan_status(plan_id)
-            if status == calculation.Success: # if the status is sucess
-                return True, True # return True 
-            else: 
-                return False, False # else return false condition
-        except Exception as ex:
-            self._logger.error(f"Motion Id {plan_id} doesn't exist: {str(ex)}") # raise the Exception values 
-            raise ex
 
 def main(args=None):
     rclpy.init(args=args)
-    kinematics=MairaKinematics()
-    rclpy.spin(kinematics)
-    kinematics.destroy_node()
-    rclpy.shutdown()
+    node = MairaKinematics()
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
-
-    kinematics.move_joint_to_cartesian()
-    kinematics.move_joint_to_joint()
-    kinematics.move_linear()
-    kinematics.move_linear_via_points()
-    kinematics.move_joint_via_points
-    kinematics.plan_motion_joint_to_joint()
-    kinematics.plan_motion_linear()
-    kinematics.plan_motion_linear_via_points()
-    kinematics.plan_motion_joint_via_points()
-    
-
-if __name__=="__main__":
+if __name__ == '__main__':
     main()
