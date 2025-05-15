@@ -1,10 +1,10 @@
-import threading
-from typing import List
+import threading # import threading module
+from typing import List # importing List module
 
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import Bool, String, Int32MultiArray
-from sensor_msgs.msg import JointState, JointTrajectory
+import rclpy # importing rclpy
+from rclpy.node import Node # importing Node 
+from std_msgs.msg import Bool, String, Int32MultiArray 
+from sensor_msgs.msg import JointState, JointTrajectory 
 from geometry_msgs.msg import Pose, PoseArray
 
 from neura_apps.gui_program.program import Program
@@ -19,8 +19,10 @@ from neurapy_ai_utils.functions.utils import init_logger
 from omniORB import CORBA
 
 from neurapy_ai_utils.robot.kinematics_interface import KinematicsInterface
-from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
+from neurapy_ai_utils.robot.elbow_checker import ElbowChecker 
 
+
+### creating class ThreadSafCmdIDManager ###########
 
 class ThreadSafeCmdIDManager:
     """Thread-safe wrapper around CmdIDManager."""
@@ -29,6 +31,8 @@ class ThreadSafeCmdIDManager:
         self._lock = threading.Lock()
         self._mgr = id_manager or CmdIDManager()
 
+### definig an function for updating the id ###############
+
     def update_id(self) -> int:
         """
         Atomically increment and return the new ID.
@@ -36,6 +40,9 @@ class ThreadSafeCmdIDManager:
         with self._lock:
             return self._mgr.update_id()
 
+
+
+### Defining the class MairaKinematics #########
 
 class MairaKinematics(Node):
     """Access methods to plan and execute motions via the MAiRA control API."""
@@ -56,11 +63,11 @@ class MairaKinematics(Node):
         super().__init__("maira_kinematics")
 
         # Motion parameters
-        self.speed_move_joint = speed_move_joint
-        self.acc_move_joint = acc_move_joint
-        self.speed_move_linear = speed_move_linear
-        self.acc_move_linear = acc_move_linear
-        self.require_elbow_up = require_elbow_up
+        self.speed_move_joint = speed_move_joint # setting the move joint
+        self.acc_move_joint = acc_move_joint # setting up the acc move joint
+        self.speed_move_linear = speed_move_linear # setting up the move linear
+        self.acc_move_linear = acc_move_linear # setting up the acc for move linear
+        self.require_elbow_up = require_elbow_up # setting up the reuire elbow up
 
         # Thread-safe command ID manager
         self._id_manager = ThreadSafeCmdIDManager(id_manager=id_manager)
@@ -71,20 +78,18 @@ class MairaKinematics(Node):
         self._program = Program(self._robot)
 
         self.num_joints = self._robot.dof
+
         if self.require_elbow_up:
             self._elbow_checker = ElbowChecker(
                 dof=self.num_joints,
                 robot_name=self._robot.robot_name,
             )
 
-        self._database_client = DatabaseClient()
+        self._database_client = DatabaseClient() # setting up the Database client 
 
         # Publishers
-        self.joint_publish = self.create_publisher(
-            JointState, 'joint_states', 10
-        )
+        self.joint_publish = self.create_publisher(JointState, 'joint_states', 10)
 
-        # publishers
         self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
         self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
         self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
@@ -112,6 +117,9 @@ class MairaKinematics(Node):
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
         self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_motion_joint_via_points, 10)
+
+
+# defining the function for unified pose callback #########
 
     def unified_pose_callback(self, msg: Pose, goal_pose: List[float]):
         goal_pose = [
@@ -674,10 +682,14 @@ class MairaKinematics(Node):
         self.pub_mjc_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_to_cartesian → {res}")
 
+##### defining function for move joint to joint ###########
+
     def move_joint_to_joint(self, msg: JointState) -> None:
         res = self.move_joint_to_joint(msg.position)
         self.pub_mjj_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_to_joint → {res}")
+
+##### defining function for move linear ##############
 
     def move_linear(self, msg: Pose) -> None:
         res = self.move_linear([
@@ -686,6 +698,8 @@ class MairaKinematics(Node):
         ])
         self.pub_ml_res.publish(Bool(data=res))
         self.get_logger().info(f"move_linear → {res}")
+
+##### defining function for move lienar via points ############
 
     def move_linear_via_points(self, msg: PoseArray) -> None:
         poses = [
@@ -697,11 +711,16 @@ class MairaKinematics(Node):
         self.pub_mlp_res.publish(Bool(data=res))
         self.get_logger().info(f"move_linear_via_points → {res}")
 
+
+##### defining function for move joint via points ############
+
     def move_joint_via_points(self, msg: JointTrajectory) -> None:
         traj = [pt.positions for pt in msg.points]
         res = self.move_joint_via_points(traj)
         self.pub_mjv_res.publish(Bool(data=res))
         self.get_logger().info(f"move_joint_via_points → {res}")
+
+##### defining function for execution ###################
 
     def execute(self, msg: Int32MultiArray) -> None:
         ids = list(msg.data)
@@ -718,10 +737,14 @@ class MairaKinematics(Node):
     #     payload = f"{ok},{pid},{last}"
     #     self.pub_plan_mjc.publish(String(data=payload))
 
+##### defining function for motion joint to joint ###############
+
     def plan_motion_joint_to_joint(self, msg: JointState) -> None:
         ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mjj.publish(String(data=payload))
+
+##### defining function for plan motion linear ##############
 
     def plan_motion_linear(self, msg: Pose) -> None:
         ok, pid, last = self.plan_motion_linear([
@@ -730,6 +753,8 @@ class MairaKinematics(Node):
         ])
         payload = f"{ok},{pid},{last}"
         self.pub_plan_ml.publish(String(data=payload))
+
+##### defining function for moiton linear via points ###############
 
     def plan_motion_linear_via_points(self, msg: PoseArray) -> None:
         poses = [
@@ -741,13 +766,15 @@ class MairaKinematics(Node):
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mlp.publish(String(data=payload))
 
+##### defining function for plan motion via points #################
+
     def plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
         traj = [pt.positions for pt in msg.points]
         ok, pid, last = self.plan_motion_joint_via_points(traj)
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mjv.publish(String(data=payload))
 
-
+##### defining main function ######
 def main(args=None):
     rclpy.init(args=args)
     kinematics = MairaKinematics()
