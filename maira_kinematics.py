@@ -750,12 +750,10 @@ class MairaKinematics(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MairaKinematics()
-    try:
-        rclpy.spin(node)
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    kinematics = MairaKinematics()
+    rclpy.spin(kinematics)
+    kinematics.destroy_node()
+    rclpy.shutdown()
 
 
 if __name__ == '__main__':
