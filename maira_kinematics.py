@@ -118,18 +118,9 @@ class MairaKinematics(Node):
             # publisher
             self.joint_publish = self.create_publisher(JointState, '/joint_command_from_cartesian', 10) 
 
-    def goal_pose_callback(self, msg: Pose):
+    def goal_pose_callback(self, msg: Pose,goal_pose: List[List[float]]):
 
-        goal_pose = [
-            msg.position.x,
-            msg.position.y,
-            msg.position.z,
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        ]
-
+        
         joint_property = {
             "target_joint": [goal_pose],
             "speed": self.speed_move_joint,
@@ -145,6 +136,15 @@ class MairaKinematics(Node):
             "blending": False, # setting the blending 
             "blend_radius": 0.0, # setting the blend radius
         }
+
+        linear_property = {
+            "target_pose": [self.start_cartesian_pose, goal_pose],# setting up the target pose
+            "speed": self.speed_move_linear ,# setting up the speed
+            "acceleration": self.acc_move_linear ,# setting up the acceleration
+            "blending": False,# setting up the blending 
+            "blend_radius": 0.0, # setting up the blend radius 
+        }
+        
         plan_id = self._id_manager.update_id() if self._id_manager else 0
 
         if self._program:
@@ -164,7 +164,7 @@ class MairaKinematics(Node):
                 current_joint_angles=self._get_current_joint_state(),
                 reusable_id=0,
             )
-            
+
             success = self._execute_if_successful(id=plan_id)
             
             if success:
