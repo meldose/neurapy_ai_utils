@@ -138,6 +138,13 @@ class MairaKinematics(Node):
             "enable_blending": True,
         }
 
+        linear_property = {
+            "target_pose": [self._get_current_cartesian_pose(), goal_pose], # setting the target pose
+            "speed": self.speed_move_linear , # setting the speed
+            "acceleration": self.acc_move_linear , # setting the acceleration
+            "blending": False, # setting the blending 
+            "blend_radius": 0.0, # setting the blend radius
+        }
         plan_id = self._id_manager.update_id() if self._id_manager else 0
 
         if self._program:
@@ -150,7 +157,16 @@ class MairaKinematics(Node):
                 reusable_id=0,
             )
 
+            self._program.set_command(
+                cmd.Linear,
+                **linear_property,
+                cmd_id=plan_id,
+                current_joint_angles=self._get_current_joint_state(),
+                reusable_id=0,
+            )
+            
             success = self._execute_if_successful(id=plan_id)
+            
             if success:
                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
             else:
