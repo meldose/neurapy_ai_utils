@@ -99,7 +99,6 @@ class MairaKinematics(Node):
         self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
         self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
         self.pub_ctj=self.create_publisher(JointState,"cartesian_to_joint_state",10)
-       # publishers
         # self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
         self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
@@ -114,8 +113,6 @@ class MairaKinematics(Node):
         self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10)
         self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
-        
-        # Subscribers 
         # self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_motion_joint_to_joint, 10)
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
