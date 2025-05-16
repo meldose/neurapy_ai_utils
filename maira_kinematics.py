@@ -4,11 +4,14 @@ import time
 import rclpy # importing rclpy
 from rclpy.node import Node # importing Node 
 from std_msgs.msg import Bool, String, Int32MultiArray 
-from sensor_msgs.msg import JointState, JointTrajectory 
+from sensor_msgs.msg import JointState, JointTrajectory
 from geometry_msgs.msg import Pose, PoseArray
 import numpy as np
 from copy import deepcopy
 from typing import List ,Optional
+from std_msgs.msg import Bool, Int32, Float32MultiArray
+
+
 
 from neura_apps.gui_program.program import Program
 from neurapy.commands.state.robot_status import RobotStatus
@@ -93,23 +96,50 @@ class MairaKinematics(Node):
         # Publishers
         self.joint_publish = self.create_publisher(JointState, 'joint_states', 10)
 
-        self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
-        self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
-        self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
-        self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
-        self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
+        self.pub_mjc_res = self.create_publisher(Pose, 'move_joint_to_cartesian/result', 10)
+        self.pub_mjj_res = self.create_publisher(Pose, 'move_joint_to_joint/result', 10)
+        self.pub_ml_res = self.create_publisher(Pose, 'move_linear/result', 10)
+        self.pub_mlp_res = self.create_publisher(Pose, 'move_linear_via_points/result', 10)
+        self.pub_mjv_res = self.create_publisher(Pose, 'move_joint_via_points/result', 10)
         self.pub_ctj=self.create_publisher(JointState,"cartesian_to_joint_state",10)
         # self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
         self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
         self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
         self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
+        # publish the current joint state when requested
+        self.pub_current_joint_state = self.create_publisher(JointState, 'current_joint_state', 10)
+
+        # publish the current Cartesian TCP pose when requested
+        self.pub_current_cartesian_pose = self.create_publisher(Pose, 'current_cartesian_pose', 10)
+
+        # publish result of execute_if_successful(id)
+        self.pub_execute_if_successful = self.create_publisher(Bool, 'execute_if_successful/result', 10)
+        # publish the IK solution for a given goal pose
+        self.pub_ik_solution = self.create_publisher(JointState, 'get_ik_solution/result', 10)
+        # publish the elbow-up IK solution
+        self.pub_elbow_up_ik_solution = self.create_publisher(JointState, 'get_elbow_up_ik_solution/result', 10)
+        # acknowledge that set_motion_till_force has been applied
+        self.pub_set_motion_till_force = self.create_publisher(Bool, 'set_motion_till_force/result', 10)
+        # trigger to read out current joint state
+        self.create_subscription(Bool,'get_current_joint_state',self._get_current_joint_state,10)
+        # trigger to read out current Cartesian TCP pose
+        self.create_subscription(Bool,'get_current_cartesian_pose',self._get_current_cartesian_pose,10)
+        # request execution check for a single ID
+        self.create_subscription(Int32,'execute_if_successful',self._execute_if_successful,10)
+
+        # request a plain IK solution
+        self.create_subscription(Pose,'get_ik_solution',self._get_ik_solution,10)
+        # request an elbow-up IK solution
+        self.create_subscription(Pose,'get_elbow_up_ik_solution',self._get_elbow_up_ik_solution,10)
+        # configure motion-till-force (expects 3 floats in data[])
+        self.create_subscription(Float32MultiArray,'set_motion_till_force',self.set_motion_till_force,10)
 
         # Subscribers 
         self.create_subscription(Pose,"move_unified_pose",self.unified_pose_callback,10)
-        self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
+        self.create_subscription(Bool, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'move_joint_to_joint', self.move_joint_to_joint, 10)
-        self.create_subscription(Pose, 'move_linear', self.move_linear, 10)
+        self.create_subscription(Bool, 'move_linear', self.move_linear, 10)
         self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10)
         self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
