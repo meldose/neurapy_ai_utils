@@ -121,7 +121,7 @@ class MairaKinematics(Node):
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
         self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_motion_joint_via_points, 10)
-        self.create_subscription(Pose,"cartesian_to_joint",self.cartesian_2_joint,10)
+        self.create_subscription(Pose,"cartesian_to_joint_state",self.cartesian_2_joint,10)
 
 
 # defining the function for unified pose callback #########
@@ -684,6 +684,7 @@ class MairaKinematics(Node):
 
 
 ##### defining function for move joint to cartesian
+
 
     def move_joint_to_cartesian(self, msg: Pose) -> None:
         res = self.move_joint_to_cartesian([
