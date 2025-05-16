@@ -107,6 +107,7 @@ class MairaKinematics(Node):
         self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
 
         # Subscribers 
+        self.create_subscription(Pose,"move_unified_pose",self.unified_pose_callback,10)
         self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'move_joint_to_joint', self.move_joint_to_joint, 10)
         self.create_subscription(Pose, 'move_linear', self.move_linear, 10)
