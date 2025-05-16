@@ -98,7 +98,7 @@ class MairaKinematics(Node):
         self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
         self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
         self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
-
+        self.pub_ctj=self.create_publisher(JointState,"cartesian_to_joint_state",10)
        # publishers
         # self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
@@ -114,13 +114,14 @@ class MairaKinematics(Node):
         self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10)
         self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
-
+        
         # Subscribers 
         # self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_motion_joint_to_joint, 10)
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
         self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_motion_joint_via_points, 10)
+        self.create_subscription(Pose,"cartesian_to_joint",self.cartesian_2_joint,10)
 
 
 # defining the function for unified pose callback #########
@@ -190,12 +191,20 @@ class MairaKinematics(Node):
                 joint_state_msg.position = joint_positions
                 self.joint_publish.publish(joint_state_msg)
                 self.get_logger().info(f"Published joint positions: {joint_positions}")
-            else:
-                self.get_logger().warn("IK solution not found for given pose.")
-        else:
-            self.get_logger().warn("No robot handler available.")
 
-                
+            else:
+
+                joint_positions = self.cartesian_2_joint(goal_pose)
+                js = JointState()
+                js.header.stamp = self.get_clock().now().to_msg()
+                js.name = self._robot.get_joint_names()
+                js.position = joint_positions
+                self.pub_ctj.publish(js)
+                self.get_logger().info(f"cartesian_to_joint → {joint_positions}")
+
+        else:
+            self.get_logger().error("cartesian_to_joint failed")
+
     reference_joint_states = None
     speed = None
     acc = None
