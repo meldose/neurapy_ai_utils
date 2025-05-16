@@ -3,12 +3,12 @@ from typing import List # importing List module
 import time
 import rclpy # importing rclpy
 from rclpy.node import Node # importing Node 
-from std_msgs.msg import Bool, String, Int32MultiArray 
-from sensor_msgs.msg import JointState, JointTrajectory
-from geometry_msgs.msg import Pose, PoseArray
-import numpy as np
-from copy import deepcopy
-from typing import List ,Optional
+from std_msgs.msg import Bool, String, Int32MultiArray # imported Bool, String, Int32MultiArray
+from sensor_msgs.msg import JointState, JointTrajectory # imported JointState, JointTrajectory
+from geometry_msgs.msg import Pose, PoseArray # imported Pose, PoseArray
+import numpy as np # imported numpy module
+from copy import deepcopy # imported copy module
+from typing import List ,Optional # imported List, Optional
 from std_msgs.msg import Bool, Int32, Float32MultiArray
 
 
