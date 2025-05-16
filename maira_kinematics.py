@@ -572,7 +572,7 @@ class MairaKinematics(Node):
             if not np.any(np.isnan(solution)):
                 return solution
         else:
-            raise ValueError(f"IK solution return nan.") # raise an Value Error
+            raise ValueError(f"IK solution return none.") # raise an Value Error
 
 
  ###########function for getting the elbow up ik solution ###############
