@@ -1,26 +1,39 @@
+
 <?xml version="1.0"?>
-<package format="2">
-    <name>neurapy_ai_utils</name>
-    <version>0.7.0</version>
-    <description>
-        Utility package to access robot and end-effector operations.
-    </description>
-    <license>NEURA Robotics</license>
-    <maintainer email="atmaraaj.gopal@neura-robotics.com">Atmaraaj Gopal</maintainer>
-    <author>Atmaraaj Gopal</author>
+<package format="3">
+  <name>neurapy_ai_utils</name>
+  <version>0.7.0</version>
+  <description>Utility package to access robot and end-effector operations.</description>
+  <license>NEURA Robotics</license>
+  <maintainer email="atmaraaj.gopal@neura-robotics.com">Atmaraaj Gopal</maintainer>
 
-    <buildtool_depend>catkin</buildtool_depend>
+  <!-- build tool -->
+  <buildtool_depend>ament_python</buildtool_depend>
 
-    <exec_depend>audio_common_msgs</exec_depend>
-    <exec_depend>neura_marker_detection_msgs</exec_depend>
-    <!-- <exec_depend>neurapy</exec_depend> -->
-    <exec_depend>neurapy_ai</exec_depend>
-    <exec_depend>rclpy</exec_depend>
-    <exec_depend>sensor_msgs</exec_depend>
-    <exec_depend>trajectory_msgs</exec_depend>
-    <exec_depend>sensor_msgs</exec_depend>
-    <exec_depend>std_msgs</exec_depend>
-    <exec_depend>tf</exec_depend>
-    <exec_depend>tf2_ros</exec_depend>
+  <!-- ROS 2 Python client library -->
+  <exec_depend>rclpy</exec_depend>
 
+  <!-- standard ROS 2 message packages -->
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- other ROS-provided message/APIs you import -->
+  <exec_depend>audio_common_msgs</exec_depend>
+  <exec_depend>neura_marker_detection_msgs</exec_depend>
+
+  <!-- your custom Python libraries -->
+  <exec_depend>neurapy</exec_depend>
+  <exec_depend>neura_apps</exec_depend>
+  <exec_depend>neurapy_ai</exec_depend>
+
+  <!-- CORBA (omniORB) is a system-level dependency; note that this must be installed on the OS -->
+  <exec_depend>omniORB</exec_depend>
+
+  <!-- for running tests & linters -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 </package>
