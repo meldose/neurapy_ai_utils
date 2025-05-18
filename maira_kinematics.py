@@ -66,7 +66,7 @@ class MairaKinematics(Node):
         id_manager: CmdIDManager = None,
         robot_handler: Robot = None,
     ):
-        super().__init__("maira_kinematics")
+        super().__init__("maira_kinematics") #intialise the node
 
         # Motion parameters
         self.speed_move_joint = speed_move_joint # setting the move joint
