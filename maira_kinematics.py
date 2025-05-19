@@ -199,17 +199,19 @@ class MairaKinematics(Node):
                 reusable_id=0,
             )
 
-            success = self._execute_if_successful(id=plan_id)
+            success = self._execute_if_successful(id=plan_id) # setting the sucess withe plain_ids
+            
 
+            # if there is success
             if success:
                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
             else:
                 self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
-
+        # if there is self._program:
         if self._robot:
-            joint_positions = self._robot.solve_ik(goal_pose)
+            joint_positions = self._robot.solve_ik(goal_pose) # getting the joint_positions
             if joint_positions is not None:
-                joint_state_msg = JointState()
+                joint_state_msg = JointState() # setting the joint_state
                 joint_state_msg.header.stamp = self.get_clock().now().to_msg()
                 joint_state_msg.name = self._robot.get_joint_names()
                 joint_state_msg.position = joint_positions
@@ -218,7 +220,7 @@ class MairaKinematics(Node):
 
             else:
 
-                joint_positions = self.cartesian_2_joint(goal_pose)
+                joint_positions = self.cartesian_2_joint(goal_pose) # setting the joint positions
                 js = JointState()
                 js.header.stamp = self.get_clock().now().to_msg()
                 js.name = self._robot.get_joint_names()
@@ -227,7 +229,7 @@ class MairaKinematics(Node):
                 self.get_logger().info(f"cartesian_to_joint → {joint_positions}")
 
         else:
-            self.get_logger().error("cartesian_to_joint failed")
+            self.get_logger().error("cartesian_to_joint failed") #getting the logger info
 
     reference_joint_states = None
     speed = None
