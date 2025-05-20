@@ -243,7 +243,7 @@ class DummyKinematics(KinematicsInterface):
         )
         print(message)
 
-# created function for wati
+# created function for wait
     def wait(self, time_s):
         print("dummy wait ", time_s)
 
@@ -348,7 +348,7 @@ class DummyKinematics(KinematicsInterface):
         return True, 4, [0] * self.num_joints
 
 
-# created function for motion join through points 
+# created function for motion joint through points 
     def plan_motion_joint_via_points(
         self,
         trajectory: List[List[float]],

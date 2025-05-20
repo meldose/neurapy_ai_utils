@@ -6,6 +6,8 @@ from sensor_msgs.msg import CameraInfo, JointState
 # calling the main function
 if __name__ == "__main__":
     rospy.init_node("test_all_alive")
+
+# creatig different services
     services = [
         "/neura_edge_refiner/refine_line",
         "/neura_marker_detection/detect_charuco",
@@ -14,6 +16,8 @@ if __name__ == "__main__":
         "/instance_segmentation/segment_instances",
         "/neura_motion_planning_server/plan",
     ]
+
+# created different rosnode topics 
 
     topics = {
         "/camera/color/camera_info": CameraInfo,
