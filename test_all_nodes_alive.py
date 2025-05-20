@@ -1,6 +1,6 @@
 import rospy #imported rospy
-from audio_common_msgs.msg import AudioData
-from sensor_msgs.msg import CameraInfo, JointState
+from audio_common_msgs.msg import AudioData # importing AudioData
+from sensor_msgs.msg import CameraInfo, JointState # importing the cameraInfo and Jointstate
 
 
 # calling the main function
@@ -20,9 +20,9 @@ if __name__ == "__main__":
 # created different rosnode topics 
 
     topics = {
-        "/camera/color/camera_info": CameraInfo,
-        "/joint_states": JointState,
-        "/audio": AudioData,
+        "/camera/color/camera_info": CameraInfo, # setting the cameraInfo
+        "/joint_states": JointState, # setting the Jointstates
+        "/audio": AudioData, # setting the AudioData
     }
 
     for service in services:
