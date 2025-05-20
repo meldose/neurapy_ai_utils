@@ -7,15 +7,17 @@ from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 # from neurapy_ai_utils.robot.moveit_kinematics import MoveitKinematics
 from neurapy_ai_utils.robot.robot import Robot
 
+# calling the main function
+
 if __name__ == "__main__":
-    marker_detection_client = MarkerDetectionClient()
-    rospy.init_node("application_run")
+    marker_detection_client = MarkerDetectionClient() #setting up the marker detection client 
+    rospy.init_node("application_run") # initalise the node 
     # robot = Robot(MoveitKinematics(), DummyGripper())
     robot = Robot(MairaKinematics(), DummyGripper())
     observe_position = [0, 0, 0, 1.5, -1.5, 0, 0]
     drop_position = observe_position
 
-    robot.move_joint_to_joint(observe_position)
+    robot.move_joint_to_joint(observe_position) # moviong the robot to the specified postion
     return_code, tags, ids = marker_detection_client.getMarkers(10)
 
     if return_code != ReturnCodes.SUCCESS or len(tags) == 0:
@@ -28,5 +30,5 @@ if __name__ == "__main__":
 
     print("---- Droping the object ---- ")
 
-    robot.move_joint_to_joint(drop_position)
-    robot.gripper.open()
+    robot.move_joint_to_joint(drop_position) # moving the robot to drop position
+    robot.gripper.open() # open the gripper
