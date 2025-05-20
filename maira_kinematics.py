@@ -3,12 +3,15 @@ from typing import List # importing List module
 import time
 import rclpy # importing rclpy
 from rclpy.node import Node # importing Node 
-from std_msgs.msg import Bool, String, Int32MultiArray 
-from sensor_msgs.msg import JointState, JointTrajectory 
-from geometry_msgs.msg import Pose, PoseArray
-import numpy as np
-from copy import deepcopy
-from typing import List ,Optional
+from std_msgs.msg import Bool, String, Int32MultiArray # imported Bool, String, Int32MultiArray
+from sensor_msgs.msg import JointState, JointTrajectory # imported JointState, JointTrajectory
+from geometry_msgs.msg import Pose, PoseArray # imported Pose, PoseArray
+import numpy as np # imported numpy module
+from copy import deepcopy # imported copy module
+from typing import List ,Optional # imported List, Optional
+from std_msgs.msg import Bool, Int32, Float32MultiArray
+
+
 
 from neura_apps.gui_program.program import Program
 from neurapy.commands.state.robot_status import RobotStatus
@@ -63,7 +66,7 @@ class MairaKinematics(Node):
         id_manager: CmdIDManager = None,
         robot_handler: Robot = None,
     ):
-        super().__init__("maira_kinematics")
+        super().__init__("maira_kinematics") #intialise the node
 
         # Motion parameters
         self.speed_move_joint = speed_move_joint # setting the move joint
@@ -90,36 +93,59 @@ class MairaKinematics(Node):
 
         self._database_client = DatabaseClient() # setting up the Database client 
 
-        # Publishers
+        ##### PUBLISHERS #############
         self.joint_publish = self.create_publisher(JointState, 'joint_states', 10)
-
-        self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
-        self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
-        self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
-        self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
-        self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
-
-       # publishers
+        self.pub_mjc_res = self.create_publisher(Pose, 'move_joint_to_cartesian/result', 10)
+        self.pub_mjj_res = self.create_publisher(Pose, 'move_joint_to_joint/result', 10)
+        self.pub_ml_res = self.create_publisher(Pose, 'move_linear/result', 10)
+        self.pub_mlp_res = self.create_publisher(Pose, 'move_linear_via_points/result', 10)
+        self.pub_mjv_res = self.create_publisher(Pose, 'move_joint_via_points/result', 10)
+        self.pub_ctj=self.create_publisher(JointState,"cartesian_to_joint_state",10)
         # self.pub_plan_mjc = self.create_publisher(String, 'plan_motion_joint_to_cartesian/result', 10)
         self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
         self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
         self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
         self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
+        # publish the current joint state when requested
+        self.pub_current_joint_state = self.create_publisher(JointState, 'current_joint_state', 10)
+        # publish the current Cartesian TCP pose when requested
+        self.pub_current_cartesian_pose = self.create_publisher(Pose, 'current_cartesian_pose', 10)
+        # publish result of execute_if_successful(id)
+        self.pub_execute_if_successful = self.create_publisher(Bool, 'execute_if_successful/result', 10)
+        # publish the IK solution for a given goal pose
+        self.pub_ik_solution = self.create_publisher(JointState, 'get_ik_solution/result', 10)
+        # publish the elbow-up IK solution
+        self.pub_elbow_up_ik_solution = self.create_publisher(JointState, 'get_elbow_up_ik_solution/result', 10)
+        # acknowledge that set_motion_till_force has been applied
+        self.pub_set_motion_till_force = self.create_publisher(Bool, 'set_motion_till_force/result', 10)
 
-        # Subscribers 
-        self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
+
+        ##### SUBSCRIPTIONS #############
+        # trigger to read out current joint state
+        self.create_subscription(Bool,'get_current_joint_state',self._get_current_joint_state,10)
+        # trigger to read out current Cartesian TCP pose
+        self.create_subscription(Bool,'get_current_cartesian_pose',self._get_current_cartesian_pose,10)
+        # request execution check for a single ID
+        self.create_subscription(Int32,'execute_if_successful',self._execute_if_successful,10)
+        # request a plain IK solution
+        self.create_subscription(Pose,'get_ik_solution',self._get_ik_solution,10)
+        # request an elbow-up IK solution
+        self.create_subscription(Pose,'get_elbow_up_ik_solution',self._get_elbow_up_ik_solution,10)
+        # configure motion-till-force (expects 3 floats in data[])
+        self.create_subscription(Float32MultiArray,'set_motion_till_force',self.set_motion_till_force,10)
+        self.create_subscription(Pose,"move_unified_pose",self.unified_pose_callback,10)
+        self.create_subscription(Bool, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'move_joint_to_joint', self.move_joint_to_joint, 10)
-        self.create_subscription(Pose, 'move_linear', self.move_linear, 10)
+        self.create_subscription(Bool, 'move_linear', self.move_linear, 10)
         self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10)
         self.create_subscription(Int32MultiArray, 'execute_ids', self.execute, 10)
-
-        # Subscribers 
         # self.create_subscription(Pose, 'plan_motion_joint_to_cartesian', self.plan_motion_joint_to_cartesian, 10)
         self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_motion_joint_to_joint, 10)
         self.create_subscription(Pose, 'plan_motion_linear', self.plan_motion_linear, 10)
         self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_motion_linear_via_points, 10)
         self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_motion_joint_via_points, 10)
+        self.create_subscription(Pose,"cartesian_to_joint_state",self.cartesian_2_joint,10)
 
 
 # defining the function for unified pose callback #########
@@ -173,28 +199,38 @@ class MairaKinematics(Node):
                 reusable_id=0,
             )
 
-            success = self._execute_if_successful(id=plan_id)
+            success = self._execute_if_successful(id=plan_id) # setting the sucess withe plain_ids
+            
 
+            # if there is success
             if success:
                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
             else:
                 self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
-
+        # if there is self._program:
         if self._robot:
-            joint_positions = self._robot.solve_ik(goal_pose)
+            joint_positions = self._robot.solve_ik(goal_pose) # getting the joint_positions
             if joint_positions is not None:
-                joint_state_msg = JointState()
+                joint_state_msg = JointState() # setting the joint_state
                 joint_state_msg.header.stamp = self.get_clock().now().to_msg()
                 joint_state_msg.name = self._robot.get_joint_names()
                 joint_state_msg.position = joint_positions
                 self.joint_publish.publish(joint_state_msg)
                 self.get_logger().info(f"Published joint positions: {joint_positions}")
-            else:
-                self.get_logger().warn("IK solution not found for given pose.")
-        else:
-            self.get_logger().warn("No robot handler available.")
 
-                
+            else:
+
+                joint_positions = self.cartesian_2_joint(goal_pose) # setting the joint positions
+                js = JointState()
+                js.header.stamp = self.get_clock().now().to_msg()
+                js.name = self._robot.get_joint_names()
+                js.position = joint_positions
+                self.pub_ctj.publish(js)
+                self.get_logger().info(f"cartesian_to_joint → {joint_positions}")
+
+        else:
+            self.get_logger().error("cartesian_to_joint failed") #getting the logger info
+
     reference_joint_states = None
     speed = None
     acc = None
@@ -571,7 +607,7 @@ class MairaKinematics(Node):
             if not np.any(np.isnan(solution)):
                 return solution
         else:
-            raise ValueError(f"IK solution return nan.") # raise an Value Error
+            raise ValueError(f"IK solution return none.") # raise an Value Error
 
 
  ###########function for getting the elbow up ik solution ###############
@@ -674,6 +710,7 @@ class MairaKinematics(Node):
 
 
 ##### defining function for move joint to cartesian
+
 
     def move_joint_to_cartesian(self, msg: Pose) -> None:
         res = self.move_joint_to_cartesian([
