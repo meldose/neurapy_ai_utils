@@ -6,51 +6,61 @@ from neurapy_ai.utils.types import EndEffector
 
 class KinematicsInterface(ABC):
 
+# created function for changin gripper to
     @abstractmethod
     def change_gripper_to(self, end_effector: EndEffector):
         print("change_gripper_to not implemented!")
         raise NotImplementedError
 
+# created function for getting joint states
     @abstractmethod
     def get_current_joint_state(self) -> List[float]:
         print("get_current_joint_state not implemented!")
         raise NotImplementedError
 
+# created function for getting current cartesina tcp pose 
     @abstractmethod
     def get_current_cartesian_tcp_pose(self) -> List[float]:
         print("get_current_cartesian_tcp_pose not implemented!")
         raise NotImplementedError
 
+# created function for converting joint to cartesian 
     @abstractmethod
     def move_joint_to_cartesian(self, goal_pose, speed=None, acc=None):
         print("move_joint_to_cartesian not implemented!")
         raise NotImplementedError
 
+# created function for move_linear
     @abstractmethod
     def move_linear(self, goal_pose, speed=None, acc=None):
         print("move_cartesian not implemented!")
         raise NotImplementedError
 
+# created function for wait 
     @abstractmethod
     def wait(self, time_s):
         print("wait not implemented")
         raise NotImplementedError
 
+# created function for cartesain to joint motion
     @abstractmethod
     def cartesian_2_joint(self, pose, reference_joint_states=None):
         print("cartesian_2_joint not implemented")
         raise NotImplementedError
 
+# created function for joint to joint 
     @abstractmethod
     def move_joint_to_joint(self, pose_joint, speed=None, acc=None):
         print("move_joint_to_joint")
         raise NotImplementedError
 
+# created function for joint movement through points
     @abstractmethod
     def move_joint_via_points(self, trajectory, speed=None, acc=None):
         print("move_joint_via_points")
         raise NotImplementedError
 
+# created function for moving linear through points
     @abstractmethod
     def move_linear_via_points(
         self,
@@ -64,6 +74,7 @@ class KinematicsInterface(ABC):
         print("move_joint_via_points")
         raise NotImplementedError
 
+# created function for setting the motion param
     @abstractmethod
     def set_motion_param(
         self, speed_mj: float, speed_ml: float, acc_mj: float, acc_ml: float
@@ -71,18 +82,21 @@ class KinematicsInterface(ABC):
         print("set_motion")
         raise NotImplementedError
 
+# created function for setting the motion till force 
     @abstractmethod
     def set_motion_till_force(
         self, stopping_forces: List[float], reflex_mode_after_contact: bool
     ) -> None:
         print("set_motion_till_force")
         raise NotImplementedError
-        
+
+# created function for excecuting      
     @abstractmethod
     def execute(self, ids: List[int], execution_feasibilities: List[bool]):
         print("execute")
         raise NotImplementedError
 
+# created function for plan motion for joint to cartesian 
     @abstractmethod
     def plan_motion_joint_to_cartesian(
         self,
@@ -96,6 +110,7 @@ class KinematicsInterface(ABC):
         print("plan_motion_joint_to_cartesian")
         raise NotImplementedError
 
+# created function for motion join to joint 
     @abstractmethod
     def plan_motion_joint_to_joint(
         self,
@@ -108,6 +123,7 @@ class KinematicsInterface(ABC):
         print("plan_motion_joint_to_joint")
         raise NotImplementedError
 
+# created function for plan motion linear 
     @abstractmethod
     def plan_motion_linear(
         self,
@@ -121,6 +137,7 @@ class KinematicsInterface(ABC):
         print("plan_motion_linear")
         raise NotImplementedError
 
+# created function for plan motion linear though points
     @abstractmethod
     def plan_motion_linear_via_points(
         self,
@@ -137,6 +154,7 @@ class KinematicsInterface(ABC):
         print("plan_motion_linear_via_points")
         raise NotImplementedError
 
+# created function for plan motion joints through pointss
     @abstractmethod
     def plan_motion_joint_via_points(
         self,
@@ -149,6 +167,7 @@ class KinematicsInterface(ABC):
         print("plan_motion_joint_via_points")
         raise NotImplementedError
 
+# created function for finish
     @abstractmethod
     def finish(
         self,
@@ -156,6 +175,7 @@ class KinematicsInterface(ABC):
         print("finish")
         raise NotImplementedError
 
+# created function for clearing the ids
     @abstractmethod
     def clear_ids(
         self,
