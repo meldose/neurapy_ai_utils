@@ -22,15 +22,15 @@ from neurapy_ai_utils.robot.robot import Robot
 
 robot = Robot(MairaKinematics())
 
-
+# creating function for move joint
 def mj(js):
     robot.move_joint_to_joint(js, speed=50, acc=20)
 
-
+# created function for move linear
 def ml(pt):
     robot.move_linear(pt, 0.25, 0.1)
 
-
+# created function for publishing the pose 
 def publish_pose(pose, title):
     print(title + "!!!!!!!!!")
     pose_msg = rc.pose_2_geometry_msg_pose(pose)

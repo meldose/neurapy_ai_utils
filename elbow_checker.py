@@ -1,7 +1,8 @@
-import numpy as np
+import numpy as np # imported numpy 
 from neurapy_ai.utils.types import Pose
-from typing import List
+from typing import List # imported typing
 
+# created class Elbowchecker
 
 class ElbowChecker:
     def __init__(self, dof=7, robot_name="maira7M") -> None:
@@ -35,6 +36,8 @@ class ElbowChecker:
                 self._link5_length = -0.324
         else:
             raise ValueError(f"Elbow checker not implemented for: {robot_name}")
+
+# created function for checking for joint state 
 
     def is_up(self, joint_state: List[float]) -> bool:
         """Check if elbow (i.e. axis 4) is up relative to the robot base

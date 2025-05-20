@@ -2,9 +2,12 @@ from neurapy_ai.clients.database_client import DatabaseClient
 
 from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 
+
+# defining the database client 
 db_client = DatabaseClient()
 robot = MairaKinematics(require_elbow_up=False)
 
+# setting up the points
 point1_name = "P9"
 point2_name = "P10"
 point3_name = "P11"

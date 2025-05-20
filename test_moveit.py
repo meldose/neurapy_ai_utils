@@ -3,7 +3,7 @@ from neurapy_ai_utils.robot.moveit_kinematics import MoveitKinematics
 # from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 import math
 
-
+# calling the main function
 if __name__ == "__main__":
 
     rospy.init_node("test_moveit")

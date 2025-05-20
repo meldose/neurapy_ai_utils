@@ -7,6 +7,7 @@ from neurapy_ai_utils.grippers.gripper_interface import DummyGripper
 from neurapy_ai_utils.robot.moveit_kinematics import MoveitKinematics
 from neurapy_ai_utils.robot.robot import Robot
 
+# calling the main function
 if __name__ == "__main__":
     hand_detection_client = HandDetectionClient()
     rospy.init_node("application_run")

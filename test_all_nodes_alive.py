@@ -1,7 +1,9 @@
-import rospy
+import rospy #imported rospy
 from audio_common_msgs.msg import AudioData
 from sensor_msgs.msg import CameraInfo, JointState
 
+
+# calling the main function
 if __name__ == "__main__":
     rospy.init_node("test_all_alive")
     services = [
