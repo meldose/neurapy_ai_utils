@@ -6,7 +6,7 @@ from neurapy_ai.utils.types import EndEffector
 
 class KinematicsInterface(ABC):
 
-# created function for changin gripper to
+# created function for changing gripper to
     @abstractmethod
     def change_gripper_to(self, end_effector: EndEffector):
         print("change_gripper_to not implemented!")
