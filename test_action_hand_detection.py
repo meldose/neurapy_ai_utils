@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     robot.move_joint_to_joint(observe_position) # moving robot to the observe position
 
-    return_code, waypoits = hand_detection_client.detect_hand_poses(2)
+    return_code, waypoits = hand_detection_client.detect_hand_poses(2) # gets two sets of hand poses
     
     # if the return code is not success
     if return_code != ReturnCodes.SUCCESS or len(waypoits) == 0:
@@ -36,7 +36,7 @@ if __name__ == "__main__":
 # if the return code is not success
     if return_code != ReturnCodes.SUCCESS or len(waypoits) == 0:
         print("Something went bad") # not success
-        exit(0)
+        exit(0) # exit the window 
     print(point_begining) 
     print(point_end)
     robot.move_joint_to_cartesian(point_begining)  # robot moving to the point begining 

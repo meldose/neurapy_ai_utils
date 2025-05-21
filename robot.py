@@ -160,8 +160,7 @@ class Robot:
         )
 
 # created function for motion joints through points
-    def plan_motion_joint_via_points(
-        self,
+    def plan_motion_joint_via_points(self,
         trajectory: List[List[float]],
         start_joint_states: Union[List[float], None] = None,
         speed: float = None,
