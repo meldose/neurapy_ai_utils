@@ -207,6 +207,7 @@ class MairaKinematics(Node):
                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
             else:
                 self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
+                
         # if there is self._program:
         if self._robot:
             joint_positions = self._robot.solve_ik(goal_pose) # getting the joint_positions
@@ -812,6 +813,7 @@ class MairaKinematics(Node):
         payload = f"{ok},{pid},{last}"
         self.pub_plan_mjv.publish(String(data=payload))
 
+
 ##### defining main function ######
 def main(args=None):
     rclpy.init(args=args)
@@ -827,9 +829,6 @@ if __name__ == '__main__':
 
 
 ############################################################
-
-
-
 
 import threading
 from typing import List, Optional
