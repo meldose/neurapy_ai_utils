@@ -1,6 +1,8 @@
-import pytest
+import pytest # imported pytest
 from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
 
+
+# creating an pytest for runing an different robot models
 @pytest.fixture(scope="session")
 def robot_configurations():
     # (joint_positions: List[float], elbow_is_up: bool)
@@ -96,13 +98,14 @@ def robot_configurations():
         # ... other robots ...
     }
 
-
+# created an fucntion for getting the robot amd config 
 @pytest.fixture(scope="function")
 def robot_and_config(request, robot_configurations):
     robot_name = request.param
     configs = robot_configurations[robot_name]
     return robot_name, configs
 
+# testing the robotname under different inpit names
 @pytest.mark.parametrize("robot_name", [
     ("maira7M", 7),
     ("maira7L", 7),
@@ -116,6 +119,8 @@ def robot_and_config(request, robot_configurations):
     ("lara5", 6),
     ("lara8", 6),
 ])
+
+# created an function for testing the elbow positions
 def test_elbow_positions(robot_name, robot_configurations):
     configs = robot_configurations[robot_name[0]]
     checker = ElbowChecker(dof=robot_name[1], robot_name=robot_name[0])

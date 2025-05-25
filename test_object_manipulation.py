@@ -1,6 +1,6 @@
-import neurapy_ai.utils.ros_conversions as rc
-import numpy as np
-import rospy
+import neurapy_ai.utils.ros_conversions as rc # imported the ros conversions as rc 
+import numpy as np # imported numpy module
+import rospy # imported rospy module
 from neurapy_ai.clients.autonomous_pick_client import (
     AutonomousPickClient,
 )
@@ -20,17 +20,17 @@ from visualization_msgs.msg import Marker, MarkerArray
 from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 from neurapy_ai_utils.robot.robot import Robot
 
-robot = Robot(MairaKinematics())
+robot = Robot(MairaKinematics()) # setting up the Robot mairakinematics 
 
-
+# creating function for move joint
 def mj(js):
     robot.move_joint_to_joint(js, speed=50, acc=20)
 
-
+# created function for move linear
 def ml(pt):
     robot.move_linear(pt, 0.25, 0.1)
 
-
+# created function for publishing the pose 
 def publish_pose(pose, title):
     print(title + "!!!!!!!!!")
     pose_msg = rc.pose_2_geometry_msg_pose(pose)
@@ -56,10 +56,10 @@ def publish_pose(pose, title):
     return
 
 
-rospy.init_node("test_node")
+rospy.init_node("test_node") # intialise the node 
 debug_pub = rospy.Publisher(
     "obj_manipulation_debug", MarkerArray, latch=True, queue_size=3
-)
+) # creating an publisher
 mesh_path = (
     "file:///home/neura_ai/data/objects/puzzle_trapezoid/puzzle_trapezoid.stl"
 )
@@ -74,6 +74,7 @@ object_names = [
 ]
 # object_names = [ ]
 
+# setting up the class for AP;DP;PP;SPG
 
 AP = AutonomousPickClient()
 print("###############")
@@ -86,7 +87,7 @@ print("###############")
 
 return_code = DP.start_detection(
     object_names, workspace_name, bin_name, gripper_name
-)
+) # return the code having the detection 
 return_code, start_picks = DP.get_picks()
 
 
@@ -96,7 +97,9 @@ print(pick.object_with_pose.pose.orientation)
 print(pick.object_with_pose.pose.translation)
 # print("1",pick.object.pose.orientation, pick.object.pose.translation)
 # ObjectWithPose("puzzle_trapezoid", Pose([0.8619932598242034, -0.37368587671781706, 0.40071055084661766], [0.6460406389209613, -0.10671023975685137, 0.2159253522158627, 0.7243069551196386]))
-start_pose = pick.object
+start_pose = pick.object 
+
+# creating the end pose with the object trapezoid 
 end_pose = ObjectWithPose(
     "puzzle_trapezoid",
     Pose(
@@ -110,58 +113,49 @@ end_pose = ObjectWithPose(
     ),
 )
 
-publish_pose(end_pose.pose, "end pose")
-# object_names = []
-# object_with_pose = pick.object #ObjectWithPose("neura_rectangle", Pose([0.9787081236664715, -0.266239122690517, 0.40439299781940985], [0.2208869610988877, -0.03058147745805732, 0.08792362448160584, 0.9708466518935827]))
-# print(object_with_pose.pose.__dict__)
-# DP.start_detection_with_known_pose(object_with_pose, workspace_name, gripper_name)
-# return_code, picks = DP.get_picks()
-# for pick in picks:
-#     print(pick.__dict__)
-
+publish_pose(end_pose.pose, "end pose") # publish the pose 
 
 # Get stable poses
 object_pose = Pose(
     [0.8906544514627149, -0.02178125628221769, 0.23297247505313398],
     [-3.134202480316162, -0.009103048592805862, 1.554972529411316],
 )
-publish_pose(object_pose, "manipulation pose")
+publish_pose(object_pose, "manipulation pose") # publish the object pose 
 
-# "puzzle_trapezoid"
-# "puzzle_trapezoid"
 SPG.start_calculation("puzzle_trapezoid", object_pose, 1)
 return_code, object_with_poses = SPG.get_poses()
 
 # Generate valid pick poses for stable poses
 picks_list = []
+
 for object_with_pose in object_with_poses:
     DP.start_detection_with_known_pose(
         object_with_pose, workspace_name, gripper_name
-    )
+    ) # getting up the database client with detection with known pose 
     return_code, picks = DP.get_picks()
     publish_pose(object_with_pose.pose, "stable pose")
     picks_list.append(picks)
 
-# DP.start_detection_with_known_pose(start_pose, workspace_name, gripper_name)
-# return_code, start_picks = DP.get_picks()
 print("start:")
 for pick in picks:
     print(pick.__dict__)
-DP.start_detection_with_known_pose(end_pose, workspace_name, gripper_name)
+DP.start_detection_with_known_pose(end_pose, workspace_name, gripper_name) # getting up the start detection with the known pose
 return_code, end_picks = DP.get_picks()
 print("end:")
 for pick in end_picks:
     print(pick.__dict__)
 
-OM = ObjectManipulationClient()
+OM = ObjectManipulationClient() # setting up the Object Manipulation client 
 return_code, sequence = OM.get_manipulation_sequence(
     start_picks,
     end_picks,
     valid_picks=picks_list,
     prefered_orientation=np.array([0.0, 0.0, -1.0]),
 )
+
 for step in sequence.manipulation_steps:
-    publish_pose(step.pick.object_with_pose.pose, "pick pose")
+
+    publish_pose(step.pick.object_with_pose.pose, "pick pose") # publishing the pose for pick pose 
     print(step.__dict__)
     mj(step.pick.approach_sequence.pre_pose.joint_state.joint_state)
     print("!!!!!!!!")

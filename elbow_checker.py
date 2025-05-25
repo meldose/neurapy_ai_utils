@@ -1,7 +1,8 @@
-import numpy as np
+import numpy as np # imported numpy 
 from neurapy_ai.utils.types import Pose
-from typing import List
+from typing import List # imported typing
 
+# created class Elbowchecker
 
 class ElbowChecker:
     def __init__(self, dof=7, robot_name="maira7M") -> None:
@@ -36,6 +37,8 @@ class ElbowChecker:
         else:
             raise ValueError(f"Elbow checker not implemented for: {robot_name}")
 
+# created function for checking for joint state 
+
     def is_up(self, joint_state: List[float]) -> bool:
         """Check if elbow (i.e. axis 4) is up relative to the robot base
 
@@ -52,6 +55,7 @@ class ElbowChecker:
         if np.nan in joint_state:
             return False
 
+# if the robot name and dof is found:
         if "maira" in self._robot_name:
             if self._dof == 7:  # for MAiRA 7
                 joint2_position = joint_state[1]
@@ -148,10 +152,11 @@ class ElbowChecker:
             raise ValueError(
                 f"ElbowChecker not implemented for {self._robot_name}"
             )
+        
         tf_1_3 = tf_1_2.dot(tf_2_3)
         tf_1_5 = tf_1_3.dot(tf_3_4).dot(tf_4_5)
         p0 = np.zeros(3)
         p1 = tf_1_3[:3, 3]
         p2 = tf_1_5[:3, 3]
         v = (p2 - p0) / 2 - p1
-        return np.sign(v[1]) == 1
+        return np.sign(v[1]) == 1 # retunrn the value of the vector with sign positive 
