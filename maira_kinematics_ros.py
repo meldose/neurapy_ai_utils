@@ -823,3 +823,355 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+
+############################################################
+
+
+
+
+import threading
+from typing import List, Optional
+import time
+import rclpy
+from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
+from rclpy.executor import MultiThreadedExecutor
+from std_msgs.msg import Bool, String, Int32, Int32MultiArray, Float32MultiArray
+from sensor_msgs.msg import JointState, JointTrajectory
+from geometry_msgs.msg import Pose, PoseArray
+import numpy as np
+from copy import deepcopy
+
+from neura_apps.gui_program.program import Program
+from neurapy.commands.state.robot_status import RobotStatus
+from neurapy.robot import Robot
+from neurapy.state_flag import calculation as cmd_calc, cmd
+from neurapy.utils import CmdIDManager
+from neurapy_ai.clients.database_client import DatabaseClient
+from neurapy_ai.utils.types import Pose as AiPose, EndEffector
+from neurapy_ai_utils.functions.utils import init_logger
+from neurapy_ai_utils.robot.elbow_checker import ElbowChecker
+
+
+class ThreadSafeCmdIDManager:
+    """Thread-safe wrapper around CmdIDManager."""
+
+    def __init__(self, id_manager: CmdIDManager = None):
+        self._lock = threading.Lock()
+        self._mgr = id_manager or CmdIDManager()
+
+    def update_id(self) -> int:
+        with self._lock:
+            return self._mgr.update_id()
+
+
+class MairaKinematics(Node):
+    """Access methods to plan and execute motions via the MAiRA control API."""
+
+    def __init__(self):
+        super().__init__(
+            'maira_kinematics',
+            enable_rosout=True,
+            use_intra_process_comms=True
+        )
+        init_logger(self)
+
+        # --- Parameters ---
+        params = [
+            ('speed_move_joint', 20), ('acc_move_joint', 20),
+            ('speed_move_linear', 0.1), ('acc_move_linear', 0.1),
+            ('rot_speed_move_linear', 0.87266463), ('rot_acc_move_linear', 1.74532925),
+            ('blending_radius', 0.005), ('require_elbow_up', True)
+        ]
+        for name, default in params:
+            self.declare_parameter(name, default)
+            setattr(self, name, self.get_parameter(name).value)
+
+        # --- Callback groups ---
+        self.io_group = MutuallyExclusiveCallbackGroup()
+        self.compute_group = ReentrantCallbackGroup()
+
+        # --- Thread-safe ID Manager ---
+        self._id_manager = ThreadSafeCmdIDManager()
+
+        # --- Robot Interface ---
+        self._robot = Robot()
+        self._robot_state = RobotStatus(self._robot)
+        self._program = Program(self._robot)
+        self.num_joints = self._robot.dof
+        if self.require_elbow_up:
+            self._elbow_checker = ElbowChecker(self.num_joints, self._robot.robot_name)
+        self._database_client = DatabaseClient()
+
+        # --- Publishers ---
+        self.joint_publish = self.create_publisher(JointState, 'joint_states', 10)
+        self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian/result', 10)
+        self.pub_mjj_res = self.create_publisher(Bool, 'move_joint_to_joint/result', 10)
+        self.pub_ml_res = self.create_publisher(Bool, 'move_linear/result', 10)
+        self.pub_mlp_res = self.create_publisher(Bool, 'move_linear_via_points/result', 10)
+        self.pub_mjv_res = self.create_publisher(Bool, 'move_joint_via_points/result', 10)
+        self.pub_ctj = self.create_publisher(JointState, 'cartesian_to_joint_state', 10)
+        self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint/result', 10)
+        self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear/result', 10)
+        self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points/result', 10)
+        self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points/result', 10)
+        self.pub_current_joint_state = self.create_publisher(JointState, 'current_joint_state', 10)
+        self.pub_current_cartesian_pose = self.create_publisher(Pose, 'current_cartesian_pose', 10)
+        self.pub_execute_if_successful = self.create_publisher(Bool, 'execute_if_successful/result', 10)
+        self.pub_ik_solution = self.create_publisher(JointState, 'get_ik_solution/result', 10)
+        self.pub_elbow_up_ik_solution = self.create_publisher(JointState, 'get_elbow_up_ik_solution/result', 10)
+
+        # --- Subscriptions ---
+        self.create_subscription(Bool, 'get_current_joint_state', self.get_current_joint_state, 10, callback_group=self.io_group)
+        self.create_subscription(Bool, 'get_current_cartesian_pose', self.get_current_cartesian_pose, 10, callback_group=self.io_group)
+        self.create_subscription(Int32, 'execute_if_successful', self.execute_single, 10, callback_group=self.io_group)
+        self.create_subscription(Pose, 'get_ik_solution', self.get_ik, 10, callback_group=self.compute_group)
+        self.create_subscription(Pose, 'get_elbow_up_ik_solution', self.get_elbow_up_ik, 10, callback_group=self.compute_group)
+        self.create_subscription(Float32MultiArray, 'set_motion_till_force', self.set_motion_till_force, 10, callback_group=self.io_group)
+        self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10, callback_group=self.io_group)
+        self.create_subscription(JointState, 'move_joint_to_joint', self.move_joint_to_joint, 10, callback_group=self.io_group)
+        self.create_subscription(Pose, 'move_linear', self.move_linear, 10, callback_group=self.io_group)
+        self.create_subscription(PoseArray, 'move_linear_via_points', self.move_linear_via_points, 10, callback_group=self.io_group)
+        self.create_subscription(JointTrajectory, 'move_joint_via_points', self.move_joint_via_points, 10, callback_group=self.io_group)
+        self.create_subscription(Int32MultiArray, 'execute_ids', self.execute_multiple, 10, callback_group=self.io_group)
+        self.create_subscription(JointState, 'plan_motion_joint_to_joint', self.plan_joint_to_joint, 10, callback_group=self.compute_group)
+        self.create_subscription(Pose, 'plan_motion_linear', self.plan_linear, 10, callback_group=self.compute_group)
+        self.create_subscription(PoseArray, 'plan_motion_linear_via_points', self.plan_linear_via_points, 10, callback_group=self.compute_group)
+        self.create_subscription(JointTrajectory, 'plan_motion_joint_via_points', self.plan_joint_via_points, 10, callback_group=self.compute_group)
+        self.create_subscription(Pose, 'cartesian_to_joint_state', self.cartesian_to_joint, 10, callback_group=self.compute_group)
+
+    # --- Callbacks ---
+    def get_current_joint_state(self, msg: Bool):
+        js = JointState()
+        js.header.stamp = self.get_clock().now().to_msg()
+        js.position = self.get_current_joint_state()
+        self.pub_current_joint_state.publish(js)
+
+    def get_current_cartesian_pose(self, msg: Bool):
+        p = Pose()
+        vals = self.get_current_cartesian_tcp_pose()
+        p.position.x, p.position.y, p.position.z = vals[:3]
+        p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = vals[3:]
+        self.pub_current_cartesian_pose.publish(p)
+
+    def execute_single(self, msg: Int32):
+        ok = self._execute_if_successful(msg.data)
+        self.pub_execute_if_successful.publish(Bool(data=ok))
+
+    def execute_multiple(self, msg: Int32MultiArray):
+        results = self.execute(list(msg.data))
+        self.pub_execute_if_successful.publish(Bool(data=all(results)))
+
+    def get_ik(self, msg: Pose):
+        try:
+            sol = self.cartesian_2_joint([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+            js = JointState()
+            js.header.stamp = self.get_clock().now().to_msg()
+            js.position = sol
+            self.pub_ik_solution.publish(js)
+        except Exception as e:
+            self.get_logger().error(f"IK failed: {e}")
+
+    def get_elbow_up_ik(self, msg: Pose):
+        try:
+            sol = self._get_elbow_up_ik_solution([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w], None)
+            js = JointState()
+            js.header.stamp = self.get_clock().now().to_msg()
+            js.position = sol
+            self.pub_elbow_up_ik_solution.publish(js)
+        except Exception as e:
+            self.get_logger().error(f"Elbow-up IK failed: {e}")
+
+    def set_motion_till_force(self, msg: Float32MultiArray):
+        self.set_motion_till_force(list(msg.data))
+
+    def move_joint_to_cartesian(self, msg: Pose):
+        ok = self.move_joint_to_cartesian([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+        self.pub_mjc_res.publish(Bool(data=ok))
+
+    def move_joint_to_joint(self, msg: JointState):
+        ok = self.move_joint_to_joint(msg.position)
+        self.pub_mjj_res.publish(Bool(data=ok))
+
+    def move_linear(self, msg: Pose):
+        ok = self.move_linear([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+        self.pub_ml_res.publish(Bool(data=ok))
+
+    def move_linear_via_points(self, msg: PoseArray):
+        goals = [[p.position.x, p.position.y, p.position.z, p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w] for p in msg.poses]
+        ok = self.move_linear_via_points(goals)
+        self.pub_mlp_res.publish(Bool(data=ok))
+
+    def move_joint_via_points(self, msg: JointTrajectory):
+        traj = [pt.positions for pt in msg.points]
+        ok = self.move_joint_via_points(traj)
+        self.pub_mjv_res.publish(Bool(data=ok))
+
+    def plan_joint_to_joint(self, msg: JointState):
+        ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
+        self.pub_plan_mjj.publish(String(data=f"{ok},{pid},{last}"))
+
+    def plan_linear(self, msg: Pose):
+        ok, pid, last = self.plan_motion_linear([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+        self.pub_plan_ml.publish(String(data=f"{ok},{pid},{last}"))
+
+    def plan_linear_via_points(self, msg: PoseArray):
+        goals = [[p.position.x, p.position.y, p.position.z, p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w] for p in msg.poses]
+        ok, pid, last = self.plan_motion_linear_via_points(goals)
+        self.pub_plan_mlp.publish(String(data=f"{ok},{pid},{last}"))
+
+    def plan_joint_via_points(self, msg: JointTrajectory):
+        traj = [pt.positions for pt in msg.points]
+        ok, pid, last = self.plan_motion_joint_via_points(traj)
+        self.pub_plan_mjv.publish(String(data=f"{ok},{pid},{last}"))
+
+    def cartesian_to_joint(self, msg: Pose):
+        sol = self.cartesian_2_joint([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
+        js = JointState()
+        js.header.stamp = self.get_clock().now().to_msg()
+        js.position = sol
+        self.pub_ctj.publish(js)
+
+    # --- Public API ---
+    def move_joint_to_cartesian(self, goal: List[float]) -> bool:
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(cmd.Joint,
+                                  target_joint=[goal],
+                                  speed=self.speed_move_joint,
+                                  acceleration=self.acc_move_joint,
+                                  interpolator=1,
+                                  enable_blending=True,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        self._program.set_command(cmd.Linear,
+                                  target_pose=[self.get_current_cartesian_tcp_pose(), goal],
+                                  speed=self.speed_move_linear,
+                                  acceleration=self.acc_move_linear,
+                                  blending=False,
+                                  blend_radius=self.blending_radius,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        return self._execute_if_successful(plan_id)
+
+    def move_joint_to_joint(self, joints: List[float]) -> bool:
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(cmd.Joint,
+                                  target_joint=[joints],
+                                  speed=self.speed_move_joint,
+                                  acceleration=self.acc_move_joint,
+                                  interpolator=1,
+                                  enable_blending=True,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        return self._execute_if_successful(plan_id)
+
+    def move_linear(self, goal: List[float]) -> bool:
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(cmd.Linear,
+                                  target_pose=[self.get_current_cartesian_tcp_pose(), goal],
+                                  speed=self.speed_move_linear,
+                                  acceleration=self.acc_move_linear,
+                                  blending=False,
+                                  blend_radius=self.blending_radius,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        return self._execute_if_successful(plan_id)
+
+    def move_linear_via_points(self, goals: List[List[float]]) -> bool:
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(cmd.Linear,
+                                  target_pose=[self.get_current_cartesian_tcp_pose()] + goals,
+                                  speed=self.speed_move_linear,
+                                  acceleration=self.acc_move_linear,
+                                  blending=False,
+                                  blend_radius=self.blending_radius,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        return self._execute_if_successful(plan_id)
+
+    def move_joint_via_points(self, traj: List[List[float]]) -> bool:
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(cmd.Joint,
+                                  target_joint=traj,
+                                  speed=self.speed_move_joint,
+                                  acceleration=self.acc_move_joint,
+                                  interpolator=1,
+                                  enable_blending=True,
+                                  cmd_id=plan_id,
+                                  current_joint_angles=self.get_current_joint_state(),
+                                  reusable_id=0)
+        return self._execute_if_successful(plan_id)
+
+    def plan_motion_joint_to_joint(self, joints: List[float]) -> (bool, int, int):
+        ok, pid, last = self._program.plan(cmd.Joint,
+                                           target_joint=[joints],
+                                           speed=self.speed_move_joint,
+                                           acceleration=self.acc_move_joint)
+        return ok, pid, last
+
+    def plan_motion_linear(self, goal: List[float]) -> (bool, int, int):
+        ok, pid, last = self._program.plan(cmd.Linear,
+                                           target_pose=[goal],
+                                           speed=self.speed_move_linear,
+                                           acceleration=self.acc_move_linear)
+        return ok, pid, last
+
+    def plan_motion_linear_via_points(self, goals: List[List[float]]) -> (bool, int, int):
+        ok, pid, last = self._program.plan(cmd.Linear,
+                                           target_pose=goals,
+                                           speed=self.speed_move_linear,
+                                           acceleration=self.acc_move_linear)
+        return ok, pid, last
+
+    def plan_motion_joint_via_points(self, traj: List[List[float]]) -> (bool, int, int):
+        ok, pid, last = self._program.plan(cmd.Joint,
+                                           target_joint=traj,
+                                           speed=self.speed_move_joint,
+                                           acceleration=self.acc_move_joint)
+        return ok, pid, last
+
+    def get_current_joint_state(self) -> List[float]:
+        return self._robot_state.getRobotStatus("jointAngles")
+
+    def get_current_cartesian_tcp_pose(self) -> List[float]:
+        pose_quat = self._robot_state.getRobotStatus("cartesianPosition")
+        return AiPose(pose_quat[:3], pose_quat[-4:]).to_list()
+
+    def _execute_if_successful(self, plan_id: int) -> bool:
+        plan_success, feasibility = self._program.check(plan_id)
+        if plan_success and feasibility:
+            self._program.execute([plan_id])
+        return plan_success
+
+    def set_motion_till_force(self, stopping_forces: List[float] = [0.0, 0.0, 1.0], reflex_mode_after_contact: bool = True) -> None:
+        self._robot.set_go_till_forces_mode_for_next_spline(
+            stopping_forces=stopping_forces,
+            stopping_force_multiplier=1.0,
+            activate_reflex_mode_after_contact=reflex_mode_after_contact
+        )
+
+    def finish(self) -> None:
+        self._program.finish()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = MairaKinematics()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+    try:
+        executor.spin()
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
