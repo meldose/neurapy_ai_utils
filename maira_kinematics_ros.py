@@ -148,93 +148,93 @@ class MairaKinematics(Node):
         self.create_subscription(Pose,"cartesian_to_joint_state",self.cartesian_2_joint,10)
 
 
-# defining the function for unified pose callback #########
+# # defining the function for unified pose callback #########
 
-    def unified_pose_callback(self, msg: Pose, goal_pose: List[float]):
-        goal_pose = [
-            msg.position.x,
-            msg.position.y,
-            msg.position.z,
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w,
-        ]
+#     def unified_pose_callback(self, msg: Pose, goal_pose: List[float]):
+#         goal_pose = [
+#             msg.position.x,
+#             msg.position.y,
+#             msg.position.z,
+#             msg.orientation.x,
+#             msg.orientation.y,
+#             msg.orientation.z,
+#             msg.orientation.w,
+#         ]
 
-        self.goal_pose_callback(msg)
-        self.linear_pose_callback(msg)
+#         self.goal_pose_callback(msg)
+#         self.linear_pose_callback(msg)
 
-        joint_property = {
-            "target_joint": [goal_pose],
-            "speed": self.speed_move_joint,
-            "acceleration": self.acc_move_joint,
-            "interpolator": 1,
-            "enable_blending": True,
-        }
+#         joint_property = {
+#             "target_joint": [goal_pose],
+#             "speed": self.speed_move_joint,
+#             "acceleration": self.acc_move_joint,
+#             "interpolator": 1,
+#             "enable_blending": True,
+#         }
 
-        linear_property = {
-            "target_pose": [self._get_current_cartesian_pose(), goal_pose],
-            "speed": self.speed_move_linear,
-            "acceleration": self.acc_move_linear,
-            "blending": False,
-            "blend_radius": 0.0,
-        }
+#         linear_property = {
+#             "target_pose": [self._get_current_cartesian_pose(), goal_pose],
+#             "speed": self.speed_move_linear,
+#             "acceleration": self.acc_move_linear,
+#             "blending": False,
+#             "blend_radius": 0.0,
+#         }
 
-        plan_id = self._id_manager.update_id() if self._id_manager else 0
+#         plan_id = self._id_manager.update_id() if self._id_manager else 0
 
-        if self._program:
-            self._program.set_command(
-                cmd.Joint,
-                **joint_property,
-                cmd_id=plan_id,
-                current_joint_angles=self._get_current_joint_state(),
-                reusable_id=0,
-            )
+#         if self._program:
+#             self._program.set_command(
+#                 cmd.Joint,
+#                 **joint_property,
+#                 cmd_id=plan_id,
+#                 current_joint_angles=self._get_current_joint_state(),
+#                 reusable_id=0,
+#             )
 
-            self._program.set_command(
-                cmd.Linear,
-                **linear_property,
-                cmd_id=plan_id,
-                current_joint_angles=self._get_current_joint_state(),
-                reusable_id=0,
-            )
+#             self._program.set_command(
+#                 cmd.Linear,
+#                 **linear_property,
+#                 cmd_id=plan_id,
+#                 current_joint_angles=self._get_current_joint_state(),
+#                 reusable_id=0,
+#             )
 
-            success = self._execute_if_successful(id=plan_id) # setting the sucess withe plain_ids
+#             success = self._execute_if_successful(id=plan_id) # setting the sucess withe plain_ids
             
 
-            # if there is success
-            if success:
-                self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
-            else:
-                self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
+#             # if there is success
+#             if success:
+#                 self.get_logger().info(f"Joint motion executed with plan ID {plan_id}")
+#             else:
+#                 self.get_logger().error(f"Execution failed for plan ID {plan_id} with pose: {goal_pose}")
                 
-        # if there is self._program:
-        if self._robot:
-            joint_positions = self._robot.solve_ik(goal_pose) # getting the joint_positions
-            if joint_positions is not None:
-                joint_state_msg = JointState() # setting the joint_state
-                joint_state_msg.header.stamp = self.get_clock().now().to_msg()
-                joint_state_msg.name = self._robot.get_joint_names()
-                joint_state_msg.position = joint_positions
-                self.joint_publish.publish(joint_state_msg)
-                self.get_logger().info(f"Published joint positions: {joint_positions}")
+#         # if there is self._program:
+#         if self._robot:
+#             joint_positions = self._robot.solve_ik(goal_pose) # getting the joint_positions
+#             if joint_positions is not None:
+#                 joint_state_msg = JointState() # setting the joint_state
+#                 joint_state_msg.header.stamp = self.get_clock().now().to_msg()
+#                 joint_state_msg.name = self._robot.get_joint_names()
+#                 joint_state_msg.position = joint_positions
+#                 self.joint_publish.publish(joint_state_msg)
+#                 self.get_logger().info(f"Published joint positions: {joint_positions}")
 
-            else:
+#             else:
 
-                joint_positions = self.cartesian_2_joint(goal_pose) # setting the joint positions
-                js = JointState()
-                js.header.stamp = self.get_clock().now().to_msg()
-                js.name = self._robot.get_joint_names()
-                js.position = joint_positions
-                self.pub_ctj.publish(js)
-                self.get_logger().info(f"cartesian_to_joint → {joint_positions}")
+#                 joint_positions = self.cartesian_2_joint(goal_pose) # setting the joint positions
+#                 js = JointState()
+#                 js.header.stamp = self.get_clock().now().to_msg()
+#                 js.name = self._robot.get_joint_names()
+#                 js.position = joint_positions
+#                 self.pub_ctj.publish(js)
+#                 self.get_logger().info(f"cartesian_to_joint → {joint_positions}")
 
-        else:
-            self.get_logger().error("cartesian_to_joint failed") #getting the logger info
+#         else:
+#             self.get_logger().error("cartesian_to_joint failed") #getting the logger info
 
-    reference_joint_states = None
-    speed = None
-    acc = None
+#     reference_joint_states = None
+#     speed = None
+#     acc = None
 
 
 ###### Defining the function for changing the gripper #########
@@ -723,41 +723,41 @@ class MairaKinematics(Node):
 
 ##### defining function for move joint to joint ###########
 
-    def move_joint_to_joint(self, msg: JointState) -> None:
-        res = self.move_joint_to_joint(msg.position)
-        self.pub_mjj_res.publish(Bool(data=res))
-        self.get_logger().info(f"move_joint_to_joint → {res}")
+#     def move_joint_to_joint(self, msg: JointState) -> None:
+#         res = self.move_joint_to_joint(msg.position)
+#         self.pub_mjj_res.publish(Bool(data=res))
+#         self.get_logger().info(f"move_joint_to_joint → {res}")
 
-##### defining function for move linear ##############
+# ##### defining function for move linear ##############
 
-    def move_linear(self, msg: Pose) -> None:
-        res = self.move_linear([
-            msg.position.x, msg.position.y, msg.position.z,
-            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
-        ])
-        self.pub_ml_res.publish(Bool(data=res))
-        self.get_logger().info(f"move_linear → {res}")
+#     def move_linear(self, msg: Pose) -> None:
+#         res = self.move_linear([
+#             msg.position.x, msg.position.y, msg.position.z,
+#             msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+#         ])
+#         self.pub_ml_res.publish(Bool(data=res))
+#         self.get_logger().info(f"move_linear → {res}")
 
-##### defining function for move lienar via points ############
+# ##### defining function for move lienar via points ############
 
-    def move_linear_via_points(self, msg: PoseArray) -> None:
-        poses = [
-            [p.position.x, p.position.y, p.position.z,
-             p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
-            for p in msg.poses
-        ]
-        res = self.move_linear_via_points(poses)
-        self.pub_mlp_res.publish(Bool(data=res))
-        self.get_logger().info(f"move_linear_via_points → {res}")
+#     def move_linear_via_points(self, msg: PoseArray) -> None:
+#         poses = [
+#             [p.position.x, p.position.y, p.position.z,
+#              p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
+#             for p in msg.poses
+#         ]
+#         res = self.move_linear_via_points(poses)
+#         self.pub_mlp_res.publish(Bool(data=res))
+#         self.get_logger().info(f"move_linear_via_points → {res}")
 
 
 ##### defining function for move joint via points ############
 
-    def move_joint_via_points(self, msg: JointTrajectory) -> None:
-        traj = [pt.positions for pt in msg.points]
-        res = self.move_joint_via_points(traj)
-        self.pub_mjv_res.publish(Bool(data=res))
-        self.get_logger().info(f"move_joint_via_points → {res}")
+    # def move_joint_via_points(self, msg: JointTrajectory) -> None:
+    #     traj = [pt.positions for pt in msg.points]
+    #     res = self.move_joint_via_points(traj)
+    #     self.pub_mjv_res.publish(Bool(data=res))
+    #     self.get_logger().info(f"move_joint_via_points → {res}")
 
 ##### defining function for execution ###################
 
@@ -778,40 +778,40 @@ class MairaKinematics(Node):
 
 ##### defining function for motion joint to joint ###############
 
-    def plan_motion_joint_to_joint(self, msg: JointState) -> None:
-        ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
-        payload = f"{ok},{pid},{last}"
-        self.pub_plan_mjj.publish(String(data=payload))
+    # def plan_motion_joint_to_joint(self, msg: JointState) -> None:
+    #     ok, pid, last = self.plan_motion_joint_to_joint(msg.position)
+    #     payload = f"{ok},{pid},{last}"
+    #     self.pub_plan_mjj.publish(String(data=payload))
 
 ##### defining function for plan motion linear ##############
 
-    def plan_motion_linear(self, msg: Pose) -> None:
-        ok, pid, last = self.plan_motion_linear([
-            msg.position.x, msg.position.y, msg.position.z,
-            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
-        ])
-        payload = f"{ok},{pid},{last}"
-        self.pub_plan_ml.publish(String(data=payload))
+    # def plan_motion_linear(self, msg: Pose) -> None:
+    #     ok, pid, last = self.plan_motion_linear([
+    #         msg.position.x, msg.position.y, msg.position.z,
+    #         msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+    #     ])
+    #     payload = f"{ok},{pid},{last}"
+    #     self.pub_plan_ml.publish(String(data=payload))
 
 ##### defining function for moiton linear via points ###############
 
-    def plan_motion_linear_via_points(self, msg: PoseArray) -> None:
-        poses = [
-            [p.position.x, p.position.y, p.position.z,
-             p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
-            for p in msg.poses
-        ]
-        ok, pid, last = self.plan_motion_linear_via_points(poses)
-        payload = f"{ok},{pid},{last}"
-        self.pub_plan_mlp.publish(String(data=payload))
+    # def plan_motion_linear_via_points(self, msg: PoseArray) -> None:
+    #     poses = [
+    #         [p.position.x, p.position.y, p.position.z,
+    #          p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
+    #         for p in msg.poses
+    #     ]
+    #     ok, pid, last = self.plan_motion_linear_via_points(poses)
+    #     payload = f"{ok},{pid},{last}"
+    #     self.pub_plan_mlp.publish(String(data=payload))
 
 ##### defining function for plan motion via points #################
 
-    def plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
-        traj = [pt.positions for pt in msg.points]
-        ok, pid, last = self.plan_motion_joint_via_points(traj)
-        payload = f"{ok},{pid},{last}"
-        self.pub_plan_mjv.publish(String(data=payload))
+    # def plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
+    #     traj = [pt.positions for pt in msg.points]
+    #     ok, pid, last = self.plan_motion_joint_via_points(traj)
+    #     payload = f"{ok},{pid},{last}"
+    #     self.pub_plan_mjv.publish(String(data=payload))
 
 
 ##### defining main function ######
