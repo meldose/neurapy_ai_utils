@@ -1,13 +1,14 @@
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from control_msgs.action import FollowJointTrajectory
-from trajectory_msgs.msg import JointTrajectoryPoint
-from builtin_interfaces.msg import Duration
+import rclpy # imported rclyp module 
+from rclpy.node import Node  # imported Node moudule 
+from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported ActionServer , CancelResponse, GoalResponse moudule 
+from control_msgs.action import FollowJointTrajectory # imported moudule 
+from trajectory_msgs.msg import JointTrajectoryPoint # imported moudule 
+from builtin_interfaces.msg import Duration # imported moudule 
 
-import time
+import time # imported time module 
 
 
+# class JoinTrajectoryActionserver
 class JointTrajectoryActionServer(Node):
     def __init__(self):
         super().__init__('joint_trajectory_action_server')
@@ -21,14 +22,17 @@ class JointTrajectoryActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
+# function for goal callback 
     def goal_callback(self, goal_request):
         self.get_logger().info('Received goal request.')
         return GoalResponse.ACCEPT
 
+# function for cancel callback 
     def cancel_callback(self, goal_handle):
         self.get_logger().info('Received cancel request.')
         return CancelResponse.ACCEPT
 
+# function for excecuting callback 
     async def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
         goal = goal_handle.request
@@ -54,12 +58,13 @@ class JointTrajectoryActionServer(Node):
         return result
 
 
+# main function 
 def main(args=None):
     rclpy.init(args=args)
     action_server = JointTrajectoryActionServer()
     rclpy.spin(action_server)
     rclpy.shutdown()
 
-
+# calling main function
 if __name__ == '__main__':
     main()
