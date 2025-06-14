@@ -1,26 +1,42 @@
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from rclpy.executors import AsyncIOExecutor
+from rclpy.action.server import ServerGoalHandle
+from rclpy.executors import MultiThreadedExecutor
+
 from control_msgs.action import FollowJointTrajectory
-from trajectory_msgs.msg import JointTrajectoryPoint
-from geometry_msgs.msg import Pose, Point, Quaternion
-from moveit_commander import MoveGroupCommander
-from typing import List, Optional
-from tf_transformations import quaternion_from_euler
-import time
-import asyncio
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Pose, PoseArray, Point, Quaternion
+from std_msgs.msg import String, Bool
+from typing import List, Tuple
+
 
 class MairaKinematics(Node):
     def __init__(self):
         super().__init__('maira_kinematics')
-        # Declare a parameter for Cartesian target pose (x, y, z, roll, pitch, yaw)
-        self.declare_parameter('cartesian_pose', [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        # Initialize MoveIt! planning group (replace 'arm' with your actual group name)
-        self.group = MoveGroupCommander('arm')
+        self.declare_parameter('cartesian_pose', [0.0] * 7)
 
-        # Set up the FollowJointTrajectory action server
+
+        # Publishers and subscribers
+        self.pub_plan_mlp = self.create_publisher(String, 'plan_motion_linear_via_points', 10)
+        self.sub_pose_array = self.create_subscription(PoseArray, 'pose_array', self.plan_motion_linear_via_points, 10)
+
+        self.pub_plan_mjv = self.create_publisher(String, 'plan_motion_joint_via_points', 10)
+        self.sub_joint_traj = self.create_subscription(JointTrajectory, 'joint_trajectory', self.plan_motion_joint_via_points, 10)
+
+        self.pub_plan_mjj = self.create_publisher(String, 'plan_motion_joint_to_joint', 10)
+        self.sub_joint_state = self.create_subscription(JointState, 'joint_state', self.plan_motion_joint_to_joint, 10)
+
+        self.pub_plan_ml = self.create_publisher(String, 'plan_motion_linear', 10)
+        self.sub_single_pose = self.create_subscription(Pose, 'pose', self.plan_motion_linear, 10)
+
+        self.pub_mjc_res = self.create_publisher(Bool, 'move_joint_to_cartesian_result', 10)
+        self.sub_pose_mjc = self.create_subscription(Pose, 'move_joint_to_cartesian', self.move_joint_to_cartesian, 10)
+
+        # Action server for FollowJointTrajectory
         self._action_server = ActionServer(
             node=self,
             action_type=FollowJointTrajectory,
@@ -31,202 +47,153 @@ class MairaKinematics(Node):
         )
 
     def goal_callback(self, goal_request):
-        """Accept all incoming trajectory goals."""
         self.get_logger().info('Received new trajectory goal')
         return GoalResponse.ACCEPT
 
-    def cancel_callback(self, goal_handle):
-        """Allow cancellation of the trajectory execution."""
+    def cancel_callback(self, goal_handle: ServerGoalHandle):
         self.get_logger().info('Received cancel request')
         return CancelResponse.ACCEPT
 
-    @staticmethod
-    def _throw_if_joint_invalid(joint_states: List[float], num_joints: int) -> None:
-        """Throw if the joint_states list isn't exactly num_joints long."""
-        if isinstance(joint_states, tuple):
-            joint_states = list(joint_states)
-        if not (isinstance(joint_states, list) and len(joint_states) == num_joints):
-            raise TypeError(f"[ERROR] joint_states must be a list of length {num_joints}!")
+    def execute_callback(self, goal_handle: ServerGoalHandle):
+        self.get_logger().info('Executing trajectory goal...')
+        trajectory = goal_handle.request.trajectory
+        points: List[JointTrajectoryPoint] = trajectory.points
 
-    @staticmethod
-    def _throw_if_pose_invalid(pose: List[float]) -> None:
-        """Throw error if given pose is not valid (6-DOF)."""
-        if not (isinstance(pose, list) and len(pose) == 6):
-            raise TypeError("[ERROR] goal_pose should be a list with length 6!")
+        positions_list = [pt.positions for pt in points]
+        ok_plan, plan_id, last_idx = self.motion_joint_via_points(positions_list)
+        if not ok_plan:
+            self.get_logger().error('Failed to plan goal trajectory')
+            goal_handle.abort()
+            return FollowJointTrajectory.Result()
 
-    def _get_current_joint_state(self) -> List[float]:
-        """Return current joint states.
-
-        Returns
-        -------
-        List[float]
-            Joint states from robot state interface.
-        """
-        return self._robot_state.getRobotStatus("jointAngles")
-
-    def get_current_joint_state(self) -> List[float]:
-        """
-        Retrieves the current joint positions of the robot.
-
-        Returns
-        -------
-        List[float]
-            A list of float values representing the current joint angles/positions.
-            These are typically expressed in radians or degrees, depending on the robot's configuration.
-        """
-        # Delegate to internal method for hardware/interface abstraction
-        return self._get_current_joint_state()
-
-    def _execute_if_successful(self, id: int) -> bool:
-        """Execute trajectory for given id if successful.
-
-        Parameters
-        ----------
-        id : int
-            Id of trajectory to be executed
-
-        Returns
-        -------
-        bool
-            True if execution successful; False otherwise.
-        """
-        plan_success, execution_feasibility = self._is_id_successful(id)
-        self.get_logger().debug(
-            f"MairaKinematics::execute_if_successful: plan_success: {plan_success} "
-            f"execution_feasibility: {execution_feasibility} id: {id}"
-        )
-        if plan_success and execution_feasibility:
-            self.get_logger().debug("" + "*" * 40)
-            self.get_logger().debug(f"execute id {id}")
-            self._program.execute([id])
-        current = self.get_current_joint_state()
-        self.get_logger().info(
-            f"After execute id: {id}, joint state is: {current}"
-        )
-        return plan_success
-
-    async def execute_callback(self, goal_handle):
-        """Handle FollowJointTrajectory goals: execute joint trajectory, then a linear Cartesian move."""
-        # Log current state
-        try:
-            current_states = self.get_current_joint_state()
-            self.get_logger().info(f"Current joint states: {current_states}")
-        except Exception as e:
-            self.get_logger().warn(f"Failed to get current joint state: {e}")
-
-        self.get_logger().info('Starting trajectory execution...')
-        goal = goal_handle.request
-        joint_names = goal.trajectory.joint_names
-        num_joints = len(joint_names)
-
-        # Validate all trajectory points
-        try:
-            for pt in goal.trajectory.points:
-                self._throw_if_joint_invalid(pt.positions, num_joints)
-        except Exception as e:
-            self.get_logger().error(f"Invalid goal: {e}")
-            result = FollowJointTrajectory.Result()
-            result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-            return goal_handle.abort(result)
-
-        # Prepare feedback
+        # 2) Execute each waypoint, publish feedback, handle cancel
         feedback = FollowJointTrajectory.Feedback()
-        feedback.joint_names = joint_names
-
-        prev_time = 0.0
-        total = len(goal.trajectory.points)
-        for idx, pt in enumerate(goal.trajectory.points):
-            if goal_handle.is_cancel_requested:
-                self.get_logger().info('Goal canceled by client')
-                result = FollowJointTrajectory.Result()
-                result.error_code = FollowJointTrajectory.Result.PATH_TOLERANCE_VIOLATED
-                return goal_handle.cancel(result)
-
-            tfs = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
-            wait = max(0.0, tfs - prev_time)
-            prev_time = tfs
-            await asyncio.sleep(wait)
-
-            feedback.desired = pt
-            feedback.actual = pt  # simulate perfect tracking
-            feedback.error = JointTrajectoryPoint()  # zero error
-            goal_handle.publish_feedback(feedback)
-            self.get_logger().info(f"Step {idx+1}/{total} feedback published")
-
-        # After trajectory, perform a Cartesian linear move
-        cartesian_pose = self.get_parameter('cartesian_pose').get_parameter_value().double_array_value
-        self.get_logger().info(f"Executing linear move to pose: {cartesian_pose}")
-        try:
-            self._throw_if_pose_invalid(cartesian_pose)
-            success = self.move_linear(cartesian_pose)
-            if not success:
-                raise RuntimeError('move_linear returned False')
-            self.get_logger().info('Waiting for 1 second after linear move')
-            self.wait(1.0)
-        except Exception as e:
-            self.get_logger().error(f"Error in post-trajectory actions: {e}")
-            result = FollowJointTrajectory.Result()
-            result.error_code = FollowJointTrajectory.Result.GOAL_TOLERANCE_VIOLATED
-            return goal_handle.abort(result)
-
-        # Succeed the action
         result = FollowJointTrajectory.Result()
-        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
-        self.get_logger().info('All actions complete, goal succeeded')
-        return goal_handle.succeed(result)
 
-    def move_linear(
-        self,
-        goal_pose: List[float],
-        speed: Optional[float] = None,
-        acc: Optional[float] = None,
-    ) -> bool:
-        """Execute a Cartesian linear move to goal_pose with optional speed/acceleration."""
-        self._throw_if_pose_invalid(goal_pose)
-        # Build local kwargs to avoid persistent state
-        local_kwargs = {}
-        if speed is not None:
-            local_kwargs['velocity_scaling_factor'] = speed / 100.0
-        if acc is not None:
-            local_kwargs['acceleration_scaling_factor'] = acc / 100.0
+        for idx, pt in enumerate(points):
+            if goal_handle.is_cancel_requested:
+                self.group.stop()
+                goal_handle.canceled()
+                self.get_logger().info(f'Goal canceled at point {idx}')
+                return result
 
-        # Convert to ROS Pose
-        q = quaternion_from_euler(goal_pose[3], goal_pose[4], goal_pose[5])
-        ros_pose = Pose()
-        ros_pose.position = Point(x=goal_pose[0], y=goal_pose[1], z=goal_pose[2])
-        ros_pose.orientation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-        waypoints = [ros_pose]
+            # Send robot to this waypoint
+            self.group.set_joint_value_target(pt.positions)
+            success = self.group.go(wait=True)
+            if not success:
+                self.get_logger().error(f'Execution failed at point {idx}')
+                goal_handle.abort()
+                return result
 
-        try:
-            plan, fraction = self.group.compute_cartesian_path(
-                waypoints, eef_step=0.01, jump_threshold=0.0, avoid_collisions=True
-            )
-            self.get_logger().info(f"Move linear fraction: {fraction}")
-            if local_kwargs:
-                plan = self.group.retime_trajectory(
-                    self.group.get_current_state(), plan, **local_kwargs
-                )
-                self.get_logger().info('Retimed trajectory with scaling factors')
-            return bool(self.group.execute(plan, wait=True))
-        except Exception as e:
-            raise RuntimeError(f"Failed to execute move_linear: {e}")
+            # Publish feedback
+            feedback.actual.positions = list(self.group.get_current_joint_values())
+            feedback.actual.time_from_start = pt.time_from_start
+            goal_handle.publish_feedback(feedback)
 
-    @staticmethod
-    def wait(time_s: float) -> None:
-        """Block for the given time in seconds."""
-        time.sleep(time_s)
+        # 3) Cartesian post-move if configured
+        cart = self.get_parameter('cartesian_pose').value
+        cart_success = self._move_joint_to_cartesian([
+            cart[0], cart[1], cart[2], cart[3], cart[4], cart[5], 0.0
+        ])
+        if not cart_success:
+            self.get_logger().error('Cartesian post-move failed')
+            goal_handle.abort()
+            return result
+
+        # 4) Succeed
+        goal_handle.succeed()
+        self.get_logger().info('Trajectory executed successfully')
+        return result
+
+    def plan_motion_linear_via_points(self, msg: PoseArray) -> None:
+        poses = [[p.position.x, p.position.y, p.position.z,
+                  p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w]
+                 for p in msg.poses]
+        ok, plan_id, last_index = self.motion_linear_via_points(poses)
+        payload = f"{ok},{plan_id},{last_index}"
+        self.pub_plan_mlp.publish(String(data=payload))
+        self.get_logger().info(f"Published linear-via-points plan: {payload}")
+
+    def motion_linear_via_points(self, poses: List[List[float]]) -> Tuple[bool, int, int]:
+        (traj, fraction) = self.group.compute_cartesian_path(
+            [p[:3] for p in poses], 0.01, 0.0)
+        success = fraction >= 0.99
+        return success, id(traj), len(poses) - 1
+
+    def plan_motion_joint_via_points(self, msg: JointTrajectory) -> None:
+        ok, plan_id, last_index = self.motion_joint_via_points([pt.positions for pt in msg.points])
+        payload = f"{ok},{plan_id},{last_index}"
+        self.pub_plan_mjv.publish(String(data=payload))
+        self.get_logger().info(f"Published joint-via-points plan: {payload}")
+
+    def motion_joint_via_points(self, traj: List[List[float]]) -> Tuple[bool, int, int]:
+        self.group.set_joint_value_target(traj[-1])
+        plan = self.group.plan()
+        success = bool(plan)
+        return success, id(plan), len(traj) - 1
+
+    def plan_motion_joint_to_joint(self, msg: JointState) -> None:
+        ok, plan_id, last_index = self.motion_joint_to_joint(list(msg.position))
+        payload = f"{ok},{plan_id},{last_index}"
+        self.pub_plan_mjj.publish(String(data=payload))
+        self.get_logger().info(f"Published joint-to-joint plan: {payload}")
+
+    def motion_joint_to_joint(self, positions: List[float]) -> Tuple[bool, int, int]:
+        self.group.set_joint_value_target(positions)
+        plan = self.group.plan()
+        success = bool(plan)
+        return success, id(plan), 0
+
+    def plan_motion_linear(self, msg: Pose) -> None:
+        ok, plan_id, last_index = self.motion_linear([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        payload = f"{ok},{plan_id},{last_index}"
+        self.pub_plan_ml.publish(String(data=payload))
+        self.get_logger().info(f"Published linear-single plan: {payload}")
+
+    def motion_linear(self, pose_list: List[float]) -> Tuple[bool, int, int]:
+        target = Pose(
+            position=Point(x=pose_list[0], y=pose_list[1], z=pose_list[2]),
+            orientation=Quaternion(x=pose_list[3], y=pose_list[4], z=pose_list[5], w=pose_list[6])
+        )
+        self.group.set_pose_target(target)
+        plan = self.group.plan()
+        success = bool(plan)
+        return success, id(plan), 0
+
+    def move_joint_to_cartesian(self, msg: Pose) -> None:
+        res = self._move_joint_to_cartesian([
+            msg.position.x, msg.position.y, msg.position.z,
+            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
+        ])
+        self.pub_mjc_res.publish(Bool(data=res))
+        self.get_logger().info(f"move_joint_to_cartesian → {res}")
+
+    def _move_joint_to_cartesian(self, pose_list: List[float]) -> bool:
+        goal = Pose(
+            position=Point(x=pose_list[0], y=pose_list[1], z=pose_list[2]),
+            orientation=Quaternion(x=pose_list[3], y=pose_list[4], z=pose_list[5], w=pose_list[6])
+        )
+        self.group.set_pose_target(goal)
+        plan = self.group.plan()
+        if not plan:
+            return False
+        return self.group.go(wait=True)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = MairaKinematics()
-    executor = AsyncIOExecutor()
+    executor = MultiThreadedExecutor()
     executor.add_node(node)
     try:
         executor.spin()
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
