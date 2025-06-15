@@ -5,7 +5,7 @@ from sensor_msgs.msg import JointState # imported Jointstate module
 from control_msgs.action import FollowJointTrajectory # imported FollowJoitnTrajecotry module 
 from rclpy.action import ActionServer # imported Actionserver module 
 
-# class cartesianto Joint Action Server 
+# class cartesian to Joint Action Server 
 class CartesianToJointActionServer(Node):
 
     def __init__(self):
@@ -13,8 +13,8 @@ class CartesianToJointActionServer(Node):
 
         # Subscriber to Cartesian pose
         self.pose_subscriber = self.create_subscription(
-            Pose,
-            '/cartesian_pose',
+            JointState,
+            '/Joint_states',
             self.cartesian_pose_callback,
             10
         )
@@ -71,7 +71,6 @@ class CartesianToJointActionServer(Node):
                 goal_handle.abort()
                 return FollowJointTrajectory.Result()
             
-
             # Convert trajectory to joint positions
             joint_positions = []
             for point in trajectory.points:
