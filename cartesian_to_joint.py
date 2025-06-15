@@ -34,12 +34,12 @@ class CartesianToJointActionServer(Node):
         self._kinematics = MairaKinematics()
 
 
-# Publisher for joint states generated from IK
-        self._joint_pub = self.create_publisher(
-            PoseStamped,
-            '/cmd_pose',
-            10,
-        )
+# # Publisher for joint states generated from IK
+#         self._joint_pub = self.create_publisher(
+#             PoseStamped,
+#             '/cmd_pose',
+#             10,
+#         )
 
 
 # Subscribe to joint states

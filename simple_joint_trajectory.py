@@ -288,6 +288,7 @@ class SimpleJointTrajectoryServer(Node):
             goal_handle.abort()
             return FollowJointTrajectory.Result()
         
+
         # Convert trajectory to joint positions
         joint_positions = []
         for point in trajectory.points:

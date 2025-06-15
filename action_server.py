@@ -16,20 +16,18 @@ import time
 import asyncio
 from copy import deepcopy
 
-# Placeholder SDK imports (replace with real robot interfaces)
+
 from your_robot_sdk import ProgramInterface, RobotInterface, RobotStateInterface, ElbowChecker
 
 class MairaKinematics(Node):
     def __init__(self):
         super().__init__('maira_kinematics')
 
-        # --- Parameters ---
+
         self.declare_parameter('cartesian_pose', [0.0]*6)
 
-        # --- MoveIt! ---
         self.group = MoveGroupCommander('arm')
 
-        # --- Robot/Program Interfaces ---
         self._program = ProgramInterface()
         self._robot = RobotInterface()
         self._robot_state = RobotStateInterface()
@@ -127,14 +125,14 @@ class MairaKinematics(Node):
         return CancelResponse.ACCEPT
 
     async def execute_callback(self, goal_handle):
-        # 1) report state
+
         try:
             curr = self.get_current_joint_state()
             self.get_logger().info(f"[Action] Current joints: {curr}")
         except Exception as e:
             self.get_logger().warn(f"Failed read state: {e}")
 
-        # 2) validate
+
         goal = goal_handle.request
         num_j = len(goal.trajectory.joint_names)
         try:
@@ -145,7 +143,6 @@ class MairaKinematics(Node):
             res.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
             return goal_handle.abort(res)
 
-        # 3) replay trajectory points with feedback
         fb = FollowJointTrajectory.Feedback()
         fb.joint_names = goal.trajectory.joint_names
         prev = 0.0
@@ -163,7 +160,7 @@ class MairaKinematics(Node):
             goal_handle.publish_feedback(fb)
             self.get_logger().info(f"[Action] step {idx+1}/{len(goal.trajectory.points)}")
 
-        # 4) cartesian move from parameter
+  
         cart = self.get_parameter('cartesian_pose').get_parameter_value().double_array_value
         self.get_logger().info(f"[Action] linear to {cart}")
         try:
@@ -176,19 +173,19 @@ class MairaKinematics(Node):
             res.error_code = FollowJointTrajectory.Result.GOAL_TOLERANCE_VIOLATED
             return goal_handle.abort(res)
 
-        # 5) optional program execution
+
         try:
             self._execute_if_successful(0)
             self.finish()
         except Exception:
             pass
 
-        # 6) success
+
         res = FollowJointTrajectory.Result()
         res.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         return goal_handle.succeed(res)
 
-    # --- Core Implementations ---
+
     def _move_joint(self, joints: List[float]) -> bool:
         self._throw_if_joint_invalid(joints, len(joints))
         try:

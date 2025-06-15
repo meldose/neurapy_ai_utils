@@ -122,11 +122,11 @@ class Mairakinematics(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    action_server = Mairakinematics()
+    cartesian_action_server = Mairakinematics()
 
-    rclpy.spin(action_server)
+    rclpy.spin(cartesian_action_server)
 
-    action_server.destroy()
+    cartesian_action_server.destroy()
     rclpy.shutdown()
 
 if __name__ == '__main__':
