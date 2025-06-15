@@ -1,15 +1,17 @@
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import JointState
-from control_msgs.action import FollowJointTrajectory
+import rclpy  # imported rclpy module
+from rclpy.node import Node # imported Node module
+from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported ACtionServerm Goalresponse, CancelResponse module
+from geometry_msgs.msg import PoseStamped # imported Posestamped module
+from sensor_msgs.msg import JointState # imported JOinstate module
+from control_msgs.action import FollowJointTrajectory # imported FollowJointTrajectory module
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
-
+# class Mairakinematics
 class MairaKinematics:
     def __init__(self):
         self.num_joints = 6
 
+# function cartesain to joint
     def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
         """
         Convert a Cartesian pose to joint angles.
@@ -18,7 +20,7 @@ class MairaKinematics:
         # Dummy implementation: all zeros
         return [0.0] * self.num_joints
 
-
+# class CartesaintoJointActionserver
 class CartesianToJointActionServer(Node):
     def __init__(self):
         super().__init__('cartesian_to_joint_action_server')
@@ -26,19 +28,17 @@ class CartesianToJointActionServer(Node):
 
         self._kinematics = MairaKinematics()
 
-        # Listen for raw Cartesian pose goals
-        self._pose_sub = self.create_publisher(
-            PoseStamped,
-            '/cmd_pose',
-            self.on_pose_msg,
-            10,
+        self._pose_sub = self.create_subscription(
+            PoseStamped,       # message type
+            '/cmd_pose',       # topic name
+            self.on_pose_msg,  # callback
+            10,               # QoS profile
         )
-
         # Publish resulting joint states
-        self._joint_pub = self.create_subscription(
-            JointState,
-            '/joint_positions',
-            10,
+        self._joint_pub = self.create_publisher(
+            JointState,        # message type
+            '/joint_positions',# topic name
+            10,               # QoS profile
         )
 
         # FollowJointTrajectory Action server
@@ -51,6 +51,8 @@ class CartesianToJointActionServer(Node):
             cancel_callback=self.cancel_callback,
         )
 
+
+# function  for on pose msg
     def on_pose_msg(self, msg: PoseStamped) -> None:
         """
         Handle incoming PoseStamped messages, convert to joint angles, and publish.
@@ -68,15 +70,19 @@ class CartesianToJointActionServer(Node):
         self._joint_pub.publish(js)
         self.get_logger().info(f'Published joint positions: {joint_positions}')
 
+# function for goal callback
     def goal_callback(self, goal_request) -> GoalResponse:
         self.get_logger().info('Received FollowJointTrajectory goal request')
         # You can inspect goal_request.trajectory here
         return GoalResponse.ACCEPT
 
+# function for cancel callback
     def cancel_callback(self, goal_handle) -> CancelResponse:
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
 
+
+# function for executing callback
     def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
         self.get_logger().info('Executing trajectory')
         trajectory = goal_handle.request.trajectory
@@ -121,7 +127,7 @@ class CartesianToJointActionServer(Node):
         self.get_logger().info('Trajectory execution completed successfully')
         return result
 
-
+# amin function
 def main(args=None):
     rclpy.init(args=args)
     server = CartesianToJointActionServer()
@@ -133,6 +139,6 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
 
-
+# calling main function
 if __name__ == '__main__':
     main()
