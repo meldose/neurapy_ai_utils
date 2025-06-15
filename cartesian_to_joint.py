@@ -1,128 +1,138 @@
-import rclpy  # imported rclpy module 
-from rclpy.node import Node # imported Node module 
-from geometry_msgs.msg import Pose # imported Pose module 
-from sensor_msgs.msg import JointState # imported Jointstate module 
-from control_msgs.action import FollowJointTrajectory # imported FollowJoitnTrajecotry module 
-from rclpy.action import ActionServer # imported Actionserver module 
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import JointState
+from control_msgs.action import FollowJointTrajectory
 
-# class cartesian to Joint Action Server 
+
+class MairaKinematics:
+    def __init__(self):
+        self.num_joints = 6
+
+    def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
+        """
+        Convert a Cartesian pose to joint angles.
+        TODO: implement real inverse kinematics here.
+        """
+        # Dummy implementation: all zeros
+        return [0.0] * self.num_joints
+
+
 class CartesianToJointActionServer(Node):
-
     def __init__(self):
         super().__init__('cartesian_to_joint_action_server')
+        self.get_logger().info('Initializing Cartesian→Joint action server')
 
-        # Subscriber to Cartesian pose
-        self.pose_subscriber = self.create_subscription(
+        self._kinematics = MairaKinematics()
+
+        # Listen for raw Cartesian pose goals
+        self._pose_sub = self.create_publisher(
+            PoseStamped,
+            '/cmd_pose',
+            self.on_pose_msg,
+            10,
+        )
+
+        # Publish resulting joint states
+        self._joint_pub = self.create_subscription(
             JointState,
-            '/Joint_states',
-            self.cartesian_pose_callback,
-            10
+            '/joint_positions',
+            10,
         )
 
-        # Publisher for joint positions
-        self.joint_publisher = self.create_publisher(JointState, '/joint_positions', 10)
-
-        # Action server
+        # FollowJointTrajectory Action server
         self._action_server = ActionServer(
-            self,
-            FollowJointTrajectory,
-            "joint_trajectory_position_controller/follow_joint_trajectory",
-            self.execute_callback
+            node=self,
+            action_type=FollowJointTrajectory,
+            action_name='joint_trajectory_position_controller/follow_joint_trajectory',
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback,
         )
 
-# function for cartesian pose callback 
-    def cartesian_pose_callback(self, pose_msg:JointState):
-        self.get_logger().info(f'Received Cartesian Pose: {pose_msg}')
+    def on_pose_msg(self, msg: PoseStamped) -> None:
+        """
+        Handle incoming PoseStamped messages, convert to joint angles, and publish.
+        """
+        self.get_logger().info('Received PoseStamped')
+        joint_positions = self._kinematics.cartesian_to_joint(msg)
+        if joint_positions is None:
+            self.get_logger().error('IK failed: could not compute joint positions')
+            return
 
-        # Convert Cartesian pose to joint positions
-        joint_positions = self.kinematics.cartesian_to_joint(pose_msg)
+        js = JointState()
+        js.header.stamp = self.get_clock().now().to_msg()
+        js.name = [f'joint{i+1}' for i in range(self._kinematics.num_joints)]
+        js.position = joint_positions
+        self._joint_pub.publish(js)
+        self.get_logger().info(f'Published joint positions: {joint_positions}')
 
-        if joint_positions:
-            joint_state_msg = JointState()
-            joint_state_msg.header.stamp = self.get_clock().now().to_msg()
-            joint_state_msg.position = joint_positions
+    def goal_callback(self, goal_request) -> GoalResponse:
+        self.get_logger().info('Received FollowJointTrajectory goal request')
+        # You can inspect goal_request.trajectory here
+        return GoalResponse.ACCEPT
 
-            self.joint_publisher.publish(joint_state_msg)
-            self.get_logger().info(f"Published joint positions are: {joint_positions}")
-        else:
-            self.get_logger().error('Cartesian to Joint conversion failed')
+    def cancel_callback(self, goal_handle) -> CancelResponse:
+        self.get_logger().info('Cancel request received')
+        return CancelResponse.ACCEPT
 
-    # function for executing callback 
-    def execute_callback(self, goal_handle):
-            """Execute the trajectory following action.
-            
-            Parameters
-            ----------
-            goal_handle : ServerGoalHandle
-                The goal handle containing the trajectory to execute
-            """
-            self._logger.info("Executing trajectory")
-            
-            trajectory = goal_handle.request.trajectory
-            
-            # Basic validation
-            if not trajectory.points:
-                self._logger.error("Empty trajectory received")
+    def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
+        self.get_logger().info('Executing trajectory')
+        trajectory = goal_handle.request.trajectory
+
+        # Validate joint count
+        if len(trajectory.joint_names) != self._kinematics.num_joints:
+            self.get_logger().error(
+                f'Expected {self._kinematics.num_joints} joints, got {len(trajectory.joint_names)}'
+            )
+            goal_handle.abort()
+            result = FollowJointTrajectory.Result()
+            result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
+            return result
+
+        # Iterate through trajectory points
+        for idx, point in enumerate(trajectory.points):
+            # Here, you'd send each point to your robot controller
+            # e.g., self._joint_pub.publish(JointState(...))
+            if len(point.positions) != self._kinematics.num_joints:
+                self.get_logger().error(
+                    f'Point #{idx} has wrong position length ({len(point.positions)})'
+                )
                 goal_handle.abort()
-                return FollowJointTrajectory.Result()
-                
-            if len(trajectory.joint_names) != self._maira_kinematics.num_joints:
-                self._logger.error(f"Joint names mismatch. Expected {self._maira_kinematics.num_joints}, got {len(trajectory.joint_names)}")
-                goal_handle.abort()
-                return FollowJointTrajectory.Result()
-            
-            # Convert trajectory to joint positions
-            joint_positions = []
-            for point in trajectory.points:
-                if len(point.positions) != self._maira_kinematics.num_joints:
-                    self._logger.error(f"Point has {len(point.positions)} positions, expected {self._maira_kinematics.num_joints}")
-                    goal_handle.abort()
-                    return FollowJointTrajectory.Result()
-                joint_positions.append(list(point.positions))
-            
-            self._logger.info(f"Executing trajectory with {len(joint_positions)} points")
-            
-            try:
-                # Execute trajectory
-                if len(joint_positions) == 1:
-                    # Single point trajectory
-                    success = self._maira_kinematics.cartesian_to_joint (joint_positions[0]) 
-                
-                result = FollowJointTrajectory.Result()
-                    
-                
-                if success:
-                    self._logger.info("Trajectory execution completed successfully")
-                    result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
-                    goal_handle.succeed()
-                else:
-                    self._logger.error("Trajectory execution failed")
-                    result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-                    goal_handle.abort()
-                    
-                return result
-                
-            except Exception as e:
-                self._logger.error(f"Exception during trajectory execution: {e}")
                 result = FollowJointTrajectory.Result()
                 result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-                goal_handle.abort()
                 return result
 
-# main function 
+            js = JointState()
+            js.header.stamp = self.get_clock().now().to_msg()
+            js.name = trajectory.joint_names
+            js.position = list(point.positions)
+            self._joint_pub.publish(js)
+            self.get_logger().info(f'Point #{idx} → positions: {point.positions}')
+
+            # Optionally add delays based on point.time_from_start
+            # rclpy.sleep(point.time_from_start.to_sec())
+
+        # Succeeded
+        result = FollowJointTrajectory.Result()
+        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+        goal_handle.succeed()
+        self.get_logger().info('Trajectory execution completed successfully')
+        return result
+
+
 def main(args=None):
     rclpy.init(args=args)
-
-    node = CartesianToJointActionServer()
-
+    server = CartesianToJointActionServer()
     try:
-        rclpy.spin(node)
+        rclpy.spin(server)
     except KeyboardInterrupt:
-        node.get_logger().info('Shutting down node')
+        server.get_logger().info('Shutting down...')
     finally:
-        node.destroy_node()
+        server.destroy_node()
         rclpy.shutdown()
 
-# callig main function
+
 if __name__ == '__main__':
     main()
