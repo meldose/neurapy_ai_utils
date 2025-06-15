@@ -14,11 +14,7 @@ class MairaKinematics:
 
 # function cartesain to joint
     def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
-        """
-        Convert a Cartesian pose to joint angles.
-        TODO: implement real inverse kinematics here.
-        """
-        # Dummy implementation: all zeros
+        
         return [0.0] * self.num_joints
 
 # class CartesaintoJointActionserver
@@ -30,16 +26,16 @@ class CartesianToJointActionServer(Node):
         self._kinematics = MairaKinematics()
 
         self._pose_sub = self.create_subscription(
-            PoseStamped,       # message type
-            '/cmd_pose',       # topic name
-            self.on_pose_msg,  # callback
-            10,               # QoS profile
+            PoseStamped,    
+            '/cmd_pose',       
+            self.on_pose_msg,  
+            10,               
         )
         # Publish resulting joint states
         self._joint_pub = self.create_publisher(
-            JointState,        # message type
-            '/joint_positions',# topic name
-            10,               # QoS profile
+            JointState,        
+            '/joint_positions',
+            10,               
         )
 
         # FollowJointTrajectory Action server
@@ -117,9 +113,6 @@ class CartesianToJointActionServer(Node):
             js.position = list(point.positions)
             self._joint_pub.publish(js)
             self.get_logger().info(f'Point #{idx} → positions: {point.positions}')
-
-            # Optionally add delays based on point.time_from_start
-            # rclpy.sleep(point.time_from_start.to_sec())
 
         # Succeeded
         result = FollowJointTrajectory.Result()
