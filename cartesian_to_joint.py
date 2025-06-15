@@ -31,7 +31,7 @@ class CartesianToJointActionServer(Node):
         )
 
 # function for cartesian pose callback 
-    def cartesian_pose_callback(self, pose_msg:Pose):
+    def cartesian_pose_callback(self, pose_msg:JointState):
         self.get_logger().info(f'Received Cartesian Pose: {pose_msg}')
 
         # Convert Cartesian pose to joint positions
