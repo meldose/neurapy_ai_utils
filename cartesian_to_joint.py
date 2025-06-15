@@ -9,7 +9,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 # class Mairakinematics
 class MairaKinematics:
     def __init__(self):
-        self.num_joints = 6
+        self.num_joints = 7
+        self.joint_names=['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7']
 
 # function cartesain to joint
     def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
