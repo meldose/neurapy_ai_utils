@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
-import time
 
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer
+import time # imported module 
 
-from geometry_msgs.msg import Pose, PoseArray
-from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory
-from std_msgs.msg import Int32MultiArray
-from control_msgs.action import FollowJointTrajectory
+import rclpy # imported module 
+from rclpy.node import Node # imported module 
+from rclpy.action import ActionServer # imported module 
+
+from geometry_msgs.msg import Pose, PoseArray # imported module 
+from sensor_msgs.msg import JointState # imported module 
+from trajectory_msgs.msg import JointTrajectory # imported module 
+from std_msgs.msg import Int32MultiArray # imported module 
+from control_msgs.action import FollowJointTrajectory # imported module 
 
 
 class Mairakinematics(Node):
@@ -17,25 +17,25 @@ class Mairakinematics(Node):
     def __init__(self):
         super().__init__('maira_kinematics')
 
-        # Single ActionServer for FollowJointTrajectory
         self._action_server = ActionServer(
             self,
             FollowJointTrajectory,
             'joint_trajectory_position_controller/follow_joint_trajectory',
             self.execute_callback)
 
-        # default motion parameters
+        # motion parameters
         self.speed_move_joint = 1.0
         self.speed_move_linear = 1.0
         self.acc_move_joint = 1.0
         self.acc_move_linear = 1.0
+        self.joint_names=['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7']
 
     def execute_callback(self, goal_handle):
         traj: JointTrajectory = goal_handle.request.trajectory
         n_pts = len(traj.points)
         self.get_logger().info(f"Received trajectory with {n_pts} point(s).")
 
-        # Validate the trajectory
+
         try:
             self._throw_if_trajectory_invalid(traj.points)
         except TypeError as e:
@@ -64,7 +64,6 @@ class Mairakinematics(Node):
 
         return result
 
-    # ——— Your motion helpers below ———
 
     def move_joint_to_cartesian(self, msg: Pose) -> bool:
         self.get_logger().info(
@@ -94,7 +93,7 @@ class Mairakinematics(Node):
         return True
 
     def move_joint_via_points(self, msg: JointTrajectory) -> bool:
-        # extract positions-only from each trajectory point
+
         traj = [pt.positions for pt in msg.points]
         self.get_logger().info(
             f"Executing joint move via trajectory points: {traj}"
@@ -123,7 +122,6 @@ class Mairakinematics(Node):
         time.sleep(time_s)
         self.get_logger().info(f"Waited for {time_s} seconds")
 
-    # ——— Validation helpers ———
 
     def _throw_if_trajectory_invalid(self, trajectory):
         if not isinstance(trajectory, list):
