@@ -96,8 +96,7 @@ class CartesianToJointActionServer(Node):
 
         # Iterate through trajectory points
         for idx, point in enumerate(trajectory.points):
-            # Here, you'd send each point to your robot controller
-            # e.g., self._joint_pub.publish(JointState(...))
+
             if len(point.positions) != self._kinematics.num_joints:
                 self.get_logger().error(
                     f'Point #{idx} has wrong position length ({len(point.positions)})'
