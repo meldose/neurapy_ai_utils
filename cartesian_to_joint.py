@@ -1,25 +1,21 @@
-import rclpy  # imported rclpy module 
-from rclpy.node import Node # imported Node module 
-from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported Actionserver, CancelResponse, Goalresponse module 
-from geometry_msgs.msg import PoseStamped # imported Posestamped module 
-from sensor_msgs.msg import JointState # imported Jointstate module 
-from control_msgs.action import FollowJointTrajectory # imported FollowjointTrajectory module 
+import rclpy # imported rclpy module 
+from rclpy.node import Node # imported Node module
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from geometry_msgs.msg import PoseStamped # imported Posestamped module
+from sensor_msgs.msg import JointState # imported Joinstate
+from control_msgs.action import FollowJointTrajectory # importe FollowjointTrajectory
 
-# class Mairakinematics
+
 class MairaKinematics:
-    """
-    Simple kinematics stub: convert Cartesian pose to joint angles.
-    """
     def __init__(self):
         self.num_joints = 7
         self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]
 
-# function for cartesain to joint 
     def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
         # TODO: implement real IK. Here we return zeros as placeholder.
         return [0.0] * self.num_joints
 
-# class CartesiantojointActionServer
+# class Cartesianto JointAction server 
 class CartesianToJointActionServer(Node):
     """
     Action server that accepts FollowJointTrajectory goals,
@@ -33,16 +29,22 @@ class CartesianToJointActionServer(Node):
         # Kinematics solver
         self._kinematics = MairaKinematics()
 
+        # Publisher for IK-generated joint states
+        self._joint_pub = self.create_publisher(
+            JointState,
+            '/ik_joint_states',
+            10,
+        )
 
-# # Publisher for joint states generated from IK
-#         self._joint_pub = self.create_publisher(
-#             PoseStamped,
-#             '/cmd_pose',
-#             10,
-#         )
 
+        self._pose_sub = self.create_subscription(
+            PoseStamped,
+            '/cmd_pose',
+            self.on_pose_msg,
+            10,
+        )
 
-# Subscribe to joint states
+        self._latest_state: JointState | None = None
         self._joint_state_sub = self.create_subscription(
             JointState,
             '/joint_states',
@@ -50,8 +52,7 @@ class CartesianToJointActionServer(Node):
             10,
         )
 
-
-# FollowJointTrajectory action server
+        # FollowJointTrajectory action server
         self._action_server = ActionServer(
             node=self,
             action_type=FollowJointTrajectory,
@@ -61,12 +62,8 @@ class CartesianToJointActionServer(Node):
             cancel_callback=self.cancel_callback,
         )
 
-# function for on pose msg
     def on_pose_msg(self, msg: PoseStamped) -> None:
-        """
-        Handle incoming Cartesian PoseStamped messages,
-        convert to joint angles, and publish JointState.
-        """
+        """Handle incoming Cartesian PoseStamped messages, convert to joint angles, and publish."""
         self.get_logger().info('Received Cartesian pose')
         joint_positions = self._kinematics.cartesian_to_joint(msg)
         if joint_positions is None:
@@ -80,24 +77,20 @@ class CartesianToJointActionServer(Node):
         self._joint_pub.publish(js)
         self.get_logger().info(f'Published IK joint positions: {joint_positions}')
 
-# function for join state
     def joint_state(self, msg: JointState) -> None:
-        """
-        Handle incoming JointState messages by logging or processing.
-        """
-        self.get_logger().info(f'Received joint states: {dict(zip(msg.name, msg.position))}')
+        """Handle incoming JointState messages by logging and storing the latest."""
+        self._latest_state = msg
+        pos = ', '.join(f'{n}={p:.3f}' for n, p in zip(msg.name, msg.position))
+        self.get_logger().info(f'Received joint states → {pos}')
 
-# function for goal callback 
     def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
         self.get_logger().info('Received FollowJointTrajectory goal request')
         return GoalResponse.ACCEPT
 
-# function for cancel callback 
     def cancel_callback(self, goal_handle) -> CancelResponse:
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
 
-# function executing callback 
     def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
         self.get_logger().info('Executing trajectory')
         trajectory = goal_handle.request.trajectory
@@ -137,7 +130,7 @@ class CartesianToJointActionServer(Node):
         self.get_logger().info('Trajectory execution completed successfully')
         return result
 
-# main function
+
 def main(args=None):
     rclpy.init(args=args)
     server = CartesianToJointActionServer()
@@ -149,6 +142,6 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
 
-# calling main function 
+
 if __name__ == '__main__':
     main()
