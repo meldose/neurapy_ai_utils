@@ -1,26 +1,29 @@
-import rclpy # imported rclpy module 
-from rclpy.node import Node # imported Node module
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from geometry_msgs.msg import PoseStamped # imported Posestamped module
+import rclpy # imported rclpy
+from rclpy.node import Node # imported Node
+from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported Actionserver ,  GoalResponse and CancelResponse 
+from geometry_msgs.msg import PoseStamped # imported Posestamped
 from sensor_msgs.msg import JointState # imported Joinstate
-from control_msgs.action import FollowJointTrajectory # importe FollowjointTrajectory
+from std_msgs.msg import Bool # imported Bool
+from control_msgs.action import FollowJointTrajectory # imported FollowJointTrajectory
 
-
+# Simple kinematics stub: convert Cartesian pose to joint angles.
 class MairaKinematics:
     def __init__(self):
         self.num_joints = 7
-        self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]
+        self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]# setting the joint names
 
+# function for cartesian to joint
     def cartesian_to_joint(self, pose: PoseStamped) -> list[float] | None:
-        # TODO: implement real IK. Here we return zeros as placeholder.
+        # TODO: replace stub with real IK
         return [0.0] * self.num_joints
 
-# class Cartesianto JointAction server 
+# class cartesian to JointActionServer 
 class CartesianToJointActionServer(Node):
     """
     Action server that accepts FollowJointTrajectory goals,
     converts Cartesian commands to joint states, and publishes JointState messages.
-    Also listens for direct Cartesian PoseStamped messages and JointState updates.
+    Also listens for direct Cartesian PoseStamped messages and JointState updates,
+    and publishes a Bool flag when a new JointState arrives.
     """
     def __init__(self):
         super().__init__('cartesian_to_joint_action_server')
@@ -36,7 +39,14 @@ class CartesianToJointActionServer(Node):
             10,
         )
 
+        # Publisher for joint-state-received flag
+        self._joint_state_flag_pub = self.create_publisher(
+            Bool,
+            '/joint_state_received_flag',
+            10,
+        )
 
+        # Subscriber for Cartesian pose commands
         self._pose_sub = self.create_subscription(
             PoseStamped,
             '/cmd_pose',
@@ -44,6 +54,7 @@ class CartesianToJointActionServer(Node):
             10,
         )
 
+        # Subscriber for robot’s actual joint states
         self._latest_state: JointState | None = None
         self._joint_state_sub = self.create_subscription(
             JointState,
@@ -62,6 +73,7 @@ class CartesianToJointActionServer(Node):
             cancel_callback=self.cancel_callback,
         )
 
+# function for on pose msg
     def on_pose_msg(self, msg: PoseStamped) -> None:
         """Handle incoming Cartesian PoseStamped messages, convert to joint angles, and publish."""
         self.get_logger().info('Received Cartesian pose')
@@ -70,29 +82,40 @@ class CartesianToJointActionServer(Node):
             self.get_logger().error('IK failed: could not compute joint positions')
             return
 
-        js = JointState()
-        js.header.stamp = self.get_clock().now().to_msg()
-        js.name = self._kinematics.joint_names
-        js.position = joint_positions
-        self._joint_pub.publish(js)
-        self.get_logger().info(f'Published IK joint positions: {joint_positions}')
+        # js = JointState()
+        # js.header.stamp = self.get_clock().now().to_msg()
+        # js.name = self._kinematics.joint_names
+        # js.position = joint_positions
+        # self._joint_pub.publish(js)
+        # self.get_logger().info(f'Published IK joint positions: {joint_positions}')
 
+# function for joint state
     def joint_state(self, msg: JointState) -> None:
-        """Handle incoming JointState messages by logging and storing the latest."""
+        """Handle incoming JointState messages by logging, storing the latest, and publishing a flag."""
         self._latest_state = msg
         pos = ', '.join(f'{n}={p:.3f}' for n, p in zip(msg.name, msg.position))
         self.get_logger().info(f'Received joint states → {pos}')
 
+        # Publish Bool=True every time a JointState message arrives
+        flag = Bool()
+        flag.data = True
+        print(flag.data)
+        self._joint_state_flag_pub.publish(flag)
+        self.get_logger().info('Published joint_state_received_flag = True')
+
+# function for goal callback
     def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
         self.get_logger().info('Received FollowJointTrajectory goal request')
         return GoalResponse.ACCEPT
 
+# function for cancel callback
     def cancel_callback(self, goal_handle) -> CancelResponse:
-        self.get_logger().info('Cancel request received')
+        self.get_logger().info('Cancel request received...')
         return CancelResponse.ACCEPT
 
+# function for executing the trajectory
     def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
-        self.get_logger().info('Executing trajectory')
+        self.get_logger().info('Executing the trajectory.....')
         trajectory = goal_handle.request.trajectory
 
         # Validate joint count
@@ -116,21 +139,22 @@ class CartesianToJointActionServer(Node):
                 result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
                 return result
 
-            js = JointState()
-            js.header.stamp = self.get_clock().now().to_msg()
-            js.name = trajectory.joint_names
-            js.position = list(point.positions)
-            self._joint_pub.publish(js)
-            self.get_logger().info(f'Point #{idx} → positions: {point.positions}')
+            # js = JointState() # setting up the joint state
+            # js.header.stamp = self.get_clock().now().to_msg() #setting up the header stamp
+            # js.name = trajectory.joint_names # joint names
+            # js.position = list(point.positions)
+            # self._joint_pub.publish(js) # publishing the joint states
+            # self.get_logger().info(f'Point #{idx} → positions: {point.positions}')
+            # self.get_logger().info("Joint states are published successfully")
 
         # Succeeded
         result = FollowJointTrajectory.Result()
         result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         goal_handle.succeed()
-        self.get_logger().info('Trajectory execution completed successfully')
+        self.get_logger().info('Trajectory execution completed successfully and Goal achieved')
         return result
 
-
+# main function
 def main(args=None):
     rclpy.init(args=args)
     server = CartesianToJointActionServer()
@@ -142,6 +166,6 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
 
-
+# calling the main function
 if __name__ == '__main__':
     main()
