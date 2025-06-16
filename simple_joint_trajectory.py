@@ -5,6 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from control_msgs.action import FollowJointTrajectory
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectoryPoint 
 from std_msgs.msg import Header
 import time
 from typing import List, Optional
