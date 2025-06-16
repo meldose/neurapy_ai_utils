@@ -46,7 +46,7 @@ class CartesianToJointActionServer(Node):
         self._joint_state_sub = self.create_subscription(
             JointState,
             '/joint_states',
-            self.on_joint_state,
+            self.joint_state,
             10,
         )
 
@@ -81,7 +81,7 @@ class CartesianToJointActionServer(Node):
         self.get_logger().info(f'Published IK joint positions: {joint_positions}')
 
 # function for join state
-    def on_joint_state(self, msg: JointState) -> None:
+    def joint_state(self, msg: JointState) -> None:
         """
         Handle incoming JointState messages by logging or processing.
         """
