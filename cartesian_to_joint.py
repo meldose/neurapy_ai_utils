@@ -209,7 +209,7 @@ class MairaKinematics:
     ):
         self.num_joints: int = 7
         self.joint_names: List[str] = [
-            f'joint{i+1}' for i in range(self.num_joints) # setting up the joint names 
+            f'joint{i+1}' for i in range(self.num_joints) # setting up the joint names ["joint1","joint2",.....]
         ]
         self._current_joint_state: Optional[List[float]] = None
         self.speed_move_joint: float = speed_move_joint
@@ -272,7 +272,7 @@ class MairaKinematics:
         return True
 
 # class Actionserver
-class MovejointtoJOintActionServer(Node):
+class MovejointtoJointActionServer(Node):
     """
     ROS2 node that accepts PoseStamped commands whose position (x,y,z)
     plus orientation (x,y,z,w) together encode a 7-element joint target,
@@ -421,7 +421,7 @@ class MovejointtoJOintActionServer(Node):
 def main(args=None):
 
     rclpy.init(args=args)
-    node = MovejointtoJOintActionServer()
+    node = MovejointtoJointActionServer()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
