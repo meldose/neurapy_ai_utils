@@ -7,7 +7,7 @@
 # from std_msgs.msg import Bool 
 # from control_msgs.action import FollowJointTrajectory  
 # from trajectory_msgs.msg import JointTrajectoryPoint 
-# from typing import List, Optional 
+# from typing import List, Optional y
 # import time # imported time module
 
 # # class Mairakinematic
@@ -187,33 +187,48 @@
 
 
 import rclpy  # ROS2 Python client library
-from rclpy.node import Node # imported Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported Actionserver
-from sensor_msgs.msg import JointState # imported Jointstate
-from std_msgs.msg import Bool # imported Bool
-from control_msgs.action import FollowJointTrajectory # imported Joint Trajectory
-from trajectory_msgs.msg import JointTrajectoryPoint
-from typing import List, Optional
+from rclpy.node import Node  # imported Node module  
+from rclpy.executors import MultiThreadedExecutor # imported module  
+from rclpy.action import ActionServer, CancelResponse, GoalResponse 
+from sensor_msgs.msg import JointState # imported the jointstate
+from geometry_msgs.msg import PoseStamped  #imported Posestamed module
+from control_msgs.action import FollowJointTrajectory # imported ros2 action module 
+from trajectory_msgs.msg import JointTrajectoryPoint # imported module  
+from typing import List, Optional # imported module  
 import cmd_interface as cmd  # hypothetical command interface module
 
-# created class for Mairakinematics
-
+# class Mairakinematics
 class MairaKinematics:
-
-    def __init__(self,speed_move_joint=1.0, acc_move_joint=1.0):
-        self.num_joints = 7
-        self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]
+    """
+    Handles low-level joint-space motion commands for a 7-DOF manipulator.
+    """
+    def __init__(
+        self,
+        speed_move_joint: float = 1.0,
+        acc_move_joint: float = 1.0
+    ):
+        self.num_joints: int = 7
+        self.joint_names: List[str] = [
+            f'joint{i+1}' for i in range(self.num_joints)
+        ]
         self._current_joint_state: Optional[List[float]] = None
-        self.speed_move_joint = speed_move_joint
-        self.acc_move_joint = acc_move_joint
+        self.speed_move_joint: float = speed_move_joint
+        self.acc_move_joint: float = acc_move_joint
 
+        # Initialize command interface and ID manager
+        self._program: cmd.ProgramInterface = cmd.ProgramInterface()
+        self._id_manager: cmd.IdManager = cmd.IdManager()
+
+# function move joint to joint 
     def move_joint_to_joint(
         self,
         goal_pose: List[float],
         speed: Optional[float] = None,
-        acc: Optional[float] = None,
+        acc: Optional[float] = None
     ) -> bool:
+        """Plan and execute a joint-space motion to the goal_pose."""
         self.throw_if_joint_invalid(goal_pose)
+        plan_id: int = self._id_manager.update_id()
 
         props = {
             'target_joint': [goal_pose],
@@ -223,147 +238,198 @@ class MairaKinematics:
             'enable_blending': True,
         }
 
-        plan_id = self._id_manager.update_id()
         self._program.set_command(
             cmd.Joint,
             **props,
             cmd_id=plan_id,
             current_joint_angles=self.get_current_joint_state(),
-            reusable_id=0,
+            reusable_id=0
         )
 
         return self.execute_if_successful(plan_id)
 
-    def throw_if_joint_invalid(self, pose: List[float]):
-        expected = self.num_joints
-        if not isinstance(pose, list) or len(pose) != expected:
-            raise TypeError(f"Expected {expected} joint values, got {pose}")
+# function to throw if the joint isinvalid or not 
+    def throw_if_joint_invalid(self, pose: List[float]) -> None:
+        """Ensure the pose list length matches the expected joint count."""
+        if not isinstance(pose, list) or len(pose) != self.num_joints:
+            raise TypeError(
+                f"Expected {self.num_joints} joint values, got {pose}"
+            )
 
+# function to get the current joint state
     def get_current_joint_state(self) -> List[float]:
+        """Return the latest joint state or raise if unknown."""
         if self._current_joint_state is None:
             raise RuntimeError("Current joint state unknown")
         return self._current_joint_state
 
-    def execute_if_successful(self, id: int) -> bool:
-        success = self._program.execute_plan(id)
+# function to execute if the id is succesful 
+    def execute_if_successful(self, plan_id: int) -> bool:
+        """Execute a previously planned trajectory and raise on failure."""
+        success: bool = self._program.execute_plan(plan_id)
         if not success:
-            raise RuntimeError(f"Execution of plan {id} failed")
+            raise RuntimeError(f"Execution of plan {plan_id} failed")
         return True
 
-# crearted class for Action server 
+# class Actionserver
 class CartesianToJointActionServer(Node):
-
+    """
+    ROS2 node that accepts PoseStamped commands whose position (x,y,z)
+    plus orientation (x,y,z,w) together encode a 7-element joint target,
+    and also provides a FollowJointTrajectory action interface.
+    """
     def __init__(self):
         super().__init__('cartesian_to_joint_action_server')
-        self.get_logger().info('Initializing action server')
+        self.get_logger().info('Initializing action server...')
 
         # Kinematics + motion interface
-        self._kin = MairaKinematics()
+        self._kin: MairaKinematics = MairaKinematics()
 
-        # Subscriber for joint command requests
-        self._joint_sub = self.create_subscription(
-            JointState,
-            '/cmd_joint',
-            self.on_joint_cmd,
-            10,
+        # Subscribe for PoseStamped commands on /cmd_pose
+        self.create_subscription(
+            PoseStamped,
+            '/cmd_pose',
+            self.on_pose_cmd,
+            10
         )
 
-        # FollowJointTrajectory action server (optional)
+        # Subscribe to /joint_states for feedback
+        self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_state_cb,
+            10
+        )
+
+        # FollowJointTrajectory action server
         self._action_server = ActionServer(
             node=self,
             action_type=FollowJointTrajectory,
             action_name='joint_trajectory_position_controller/follow_joint_trajectory',
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
-            cancel_callback=self.cancel_callback,
+            cancel_callback=self.cancel_callback
         )
 
-        # Track latest state from sensors
-        self.create_subscription(
-            JointState,
-            '/joint_states',
-            self.joint_state_cb,
-            10,
-        )
-
-    def on_joint_cmd(self, msg: JointState) -> None:
-        self.get_logger().info('Received joint command request')
+# callback
+    def on_pose_cmd(self, msg: PoseStamped) -> None:
+        """
+        Handle incoming PoseStamped commands by interpreting
+        [pos.x, pos.y, pos.z, ori.x, ori.y, ori.z, ori.w] as joint angles.
+        """
+        self.get_logger().info('Received PoseStamped joint target on /cmd_pose')
         try:
-            success = self._kin.move_joint_to_joint(list(msg.position))
-            print(success)
+            j = msg.pose
+            joint_angles = [
+                j.position.x,
+                j.position.y,
+                j.position.z,
+                j.orientation.x,
+                j.orientation.y,
+                j.orientation.z,
+                j.orientation.w,
+            ]
+            self._kin.move_joint_to_joint(joint_angles)
+            self.get_logger().info('Motion command completed successfully')
         except Exception as e:
             self.get_logger().error(f'Motion failed: {e}')
-            return
-        self.get_logger().info('Motion command completed successfully')
 
-
+# joint state callback
     def joint_state_cb(self, msg: JointState) -> None:
+        """Update the cached current joint state from sensors."""
         self._kin._current_joint_state = list(msg.position)
 
-    def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
+
+    def goal_callback(
+        self,
+        goal_request: FollowJointTrajectory.Goal
+    ) -> GoalResponse:
+        """Validate incoming FollowJointTrajectory goals."""
         self.get_logger().info('FollowJointTrajectory goal received')
+        names = goal_request.trajectory.joint_names
+
+        if len(names) != self._kin.num_joints:
+            self.get_logger().error(
+                f'Invalid joint count: {len(names)} (expected {self._kin.num_joints})'
+            )
+            return GoalResponse.REJECT
+
+        if set(names) != set(self._kin.joint_names):
+            self.get_logger().error(
+                f'Joint name mismatch: {names} vs {self._kin.joint_names}'
+            )
+            return GoalResponse.REJECT
+
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle) -> CancelResponse:
+        """Accept all cancel requests."""
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
 
-    def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
-        self.get_logger().info('Executing trajectory…')
+    def execute_callback(
+        self,
+        goal_handle
+    ) -> FollowJointTrajectory.Result:
+        """
+        Execute each point in the trajectory sequentially, publishing feedback.
+        Blocking delays run in their own threads under a MultiThreadedExecutor.
+        """
+        self.get_logger().info('Executing trajectory...')
         traj = goal_handle.request.trajectory
         n = self._kin.num_joints
 
-        # Basic validation
-        if len(traj.joint_names) != n:
-            self.get_logger().error('Invalid # of joints')
-            goal_handle.abort()
-            res = FollowJointTrajectory.Result()
-            res.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-            return res
-
-        for idx, pt in enumerate(traj.points):
+        # Validate each point's joint count
+        for pt in traj.points:
             if len(pt.positions) != n:
                 self.get_logger().error('Point length mismatch')
                 goal_handle.abort()
-                r = FollowJointTrajectory.Result()
-                r.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-                return r
+                result = FollowJointTrajectory.Result()
+                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                return result
 
-        # Sequentially execute each waypoint
         prev_t = 0.0
-        for idx, pt in enumerate(traj.points):
+        for pt in traj.points:
             t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
             dt = t - prev_t
-            if dt > 0:
+            if dt > 0.0:
                 self.move_delay(dt)
+
             feedback = FollowJointTrajectory.Feedback(
                 joint_names=traj.joint_names,
                 desired=pt,
                 actual=pt,
-                error=JointTrajectoryPoint(),
+                error=JointTrajectoryPoint()
             )
             goal_handle.publish_feedback(feedback)
             prev_t = t
 
-        # Success
         goal_handle.succeed()
         result = FollowJointTrajectory.Result()
         result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         return result
 
-    def move_delay(self, dt: float):
-        # simple blocking delay; consider a non-blocking timer for production
+    def move_delay(self, dt: float) -> None:
+        """
+        Blocking delay—executed in its own thread under MultiThreadedExecutor,
+        so other callbacks (e.g., cancel) remain responsive.
+        """
         import time
         time.sleep(dt)
 
-
-def main(args=None):
+# main function 
+def main(args=None) -> None:
     rclpy.init(args=args)
-    server = CartesianToJointActionServer()
+    node = CartesianToJointActionServer()
+
     try:
-        rclpy.spin(server)
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        server.get_logger().info('Shutting down')
+        node.get_logger().info('Shutting down')
     finally:
-        server.destroy_node()
+        node.destroy_node()
         rclpy.shutdown()
+
+# calling the main function
+if __name__ == '__main__':
+    main()
