@@ -317,7 +317,7 @@ class CartesianToJointActionServer(Node):
         Handle incoming PoseStamped commands by interpreting
         [pos.x, pos.y, pos.z, ori.x, ori.y, ori.z, ori.w] as joint angles.
         """
-        self.get_logger().info('Received PoseStamped joint target on /cmd_pose')
+        self.get_logger().info("Recieved the joint target on cmd pose")
         try:
             j = msg.pose
             joint_angles = [
