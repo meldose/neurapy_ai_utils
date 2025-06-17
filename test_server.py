@@ -68,7 +68,7 @@ class MairaKinematics(Node):
             cancel_callback=self.accept_cancel
         )
 
-        # --- Topic interfaces for helpers ---
+
         #  Current joint state
         self.create_subscription(Empty, 'request_current_joint_state', self.request_joints_callback, 10)
         self._joints_pub = self.create_publisher(JointState, 'current_joint_state', 10)
@@ -234,12 +234,15 @@ class MairaKinematics(Node):
             self._move_jnt_via_pub.publish(Bool(data=False))
 
     # --- Core helpers ---
+
+# function for getting the current cartesian tcp pose
     def get_current_cartesian_tcp_pose(self) -> List[float]:
         if self._robot is None:
             raise RuntimeError('Robot not configured')
         status = self._robot.getRobotStatus('cartesianPosition')
         return list(status)
 
+# function for publishing the command 
     def publish_command(self, positions: List[float], tfs: Duration) -> None:
         if self._program is None:
             raise RuntimeError('Program not configured')
@@ -251,7 +254,7 @@ class MairaKinematics(Node):
         msg.points = [pt]
         self.cmd_pub.publish(msg)
 
-
+# function for validating the trajectory
     def validate_trajectory(self, points: List[JointTrajectoryPoint]) -> None:
         if not points:
             raise InvalidTrajectory('No points')
@@ -263,6 +266,7 @@ class MairaKinematics(Node):
                 raise InvalidTrajectory(f'Time non-monotonic {i}')
             last = pt.time_from_start
 
+# function for cartesian to joint
     def cartesian_2_joint(self, goal: List[float], ref: Optional[List[float]] = None) -> List[float]:
         if not isinstance(goal, list) or len(goal) not in (6,7):
             raise TypeError('Pose len must be 6 or 7')
@@ -271,6 +275,7 @@ class MairaKinematics(Node):
             return self.get_elbow_up_ik(goal, refj)
         return self.get_ik(goal, refj)
 
+# function for getting the ik 
     def get_ik(self, pose: List[float], seed: List[float]) -> List[float]:
         if self._robot is None:
             raise RuntimeError('Robot not configured')
@@ -285,6 +290,7 @@ class MairaKinematics(Node):
                 return sol
         raise RuntimeError('IK failed')
 
+# function for getting the elbow up ik
     def get_elbow_up_ik(self, pose: List[float], seed: List[float]) -> List[float]:
         if self._robot is None or self._elbow_checker is None:
             raise RuntimeError('IK/elbow not configured')
@@ -301,6 +307,7 @@ class MairaKinematics(Node):
                 continue
         raise RuntimeError('Elbow-up IK failed')
 
+# function for setting the motion till force 
     def set_motion_till_force(self, forces: Optional[List[float]] = None, reflex: bool = True):
         f = forces if forces else [0.0,0.0,1.0]
         if self._robot is None:
@@ -311,26 +318,30 @@ class MairaKinematics(Node):
             activate_reflex_mode_after_contact=reflex
         )
 
+# function for move joint to cartesian 
     def move_joint_to_cartesian(self, goal: List[float], ref: Optional[List[float]] = None) -> bool:
         jp = self.cartesian_2_joint(goal, ref)
         return self.move_joint_to_joint(jp)
 
+# function for move joint to joint
     def move_joint_to_joint(self, goal: List[float]) -> bool:
         if self._program is None or self._id_manager is None:
             raise RuntimeError('Program not configured')
         prop = {'target_joint': [goal], 'speed': self.speed_move_joint, 'acceleration': self.acc_move_joint, 'interpolator':1, 'enable_blending':True}
         pid = self._id_manager.update_id()
         self._program.set_command(cmd.Joint, **prop, cmd_id=pid, current_joint_angles=self._current_joint_state, reusable_id=0)
-        return self._is_id_successful(pid)[0]
+        return self.is_id_successful(pid)[0]
 
+# function for move linear
     def move_linear(self, goal: List[float]) -> bool:
         if self._program is None or self._id_manager is None:
             raise RuntimeError('Program not configured')
         prop = {'target_pose': [self.get_current_cartesian_tcp_pose(), goal], 'speed': self.speed_move_linear, 'acceleration': self.acc_move_linear, 'blending':False, 'blend_radius':0.0}
         pid = self._id_manager.update_id()
         self._program.set_command(cmd.Linear, **prop, cmd_id=pid, current_joint_angles=self._current_joint_state, reusable_id=0)
-        return self._is_id_successful(pid)[0]
-        
+        return self.is_id_successful(pid)[0]
+
+# function for move linear through points 
     def move_linear_via_points(self, goals: List[List[float]]) -> bool:
         poses = [self.get_current_cartesian_tcp_pose()] + goals
         if self._program is None or self._id_manager is None:
@@ -338,8 +349,9 @@ class MairaKinematics(Node):
         prop = {'target_pose': poses, 'speed': self.speed_move_linear, 'acceleration': self.acc_move_linear, 'blend_radius':0.01}
         pid = self._id_manager.update_id()
         self._program.set_command(cmd.Linear, **prop, cmd_id=pid, current_joint_angles=self._current_joint_state, reusable_id=0)
-        return self._is_id_successful(pid)[0]
+        return self.is_id_successful(pid)[0]
 
+# function for mobe joint via points
     def move_joint_via_points(self, traj: List[List[float]]) -> bool:
         if not isinstance(traj, list) or any(len(pt)!=self.num_joints for pt in traj):
             raise TypeError('Invalid joint trajectory')
@@ -348,13 +360,14 @@ class MairaKinematics(Node):
         prop = {'target_joint': traj, 'speed': self.speed_move_joint, 'acceleration': self.acc_move_joint, 'interpolator':1, 'enable_blending':True}
         pid = self._id_manager.update_id()
         self._program.set_command(cmd.Joint, **prop, cmd_id=pid, current_joint_angles=self._current_joint_state, reusable_id=0)
-        return self._is_id_successful(pid)[0]
+        return self.is_id_successful(pid)[0]
 
-    def _is_id_successful(self, cmd_id: int) -> Tuple[bool, Optional[str]]:
+# function for checking if the id is successful or not 
+    def is_id_successful(self, cmd_id: int) -> Tuple[bool, Optional[str]]:
 
         return True, None
 
-
+# main function
 def main(args=None):
     rclpy.init(args=args)
     node = MairaKinematics()
@@ -364,5 +377,6 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
+# calling main function 
 if __name__ == '__main__':
     main()
