@@ -120,7 +120,7 @@ class MairaKinematics(Node):
                 self.ik_max_retries = param.value
         return SetParametersResult(successful=True)
 
-    # --- Helpers ---
+
     @staticmethod
     def _duration_to_sec(dur: Duration) -> float:
         return dur.sec + dur.nanosec * 1e-9
@@ -170,8 +170,8 @@ class MairaKinematics(Node):
 
     def _move_jtc_callback(self, msg: Float64MultiArray):
         try:
-            ok = self.move_joint_to_cartesian(list(msg.data))
-            self._move_jtc_pub.publish(Bool(data=ok))
+            check = self.move_joint_to_cartesian(list(msg.data))
+            self._move_jtc_pub.publish(Bool(data=check))
         except Exception as e:
             self.get_logger().error(f'Move J->C error: {e}')
 
@@ -179,8 +179,8 @@ class MairaKinematics(Node):
 
     def _move_jtj_callback(self, msg: Float64MultiArray):
         try:
-            ok = self.move_joint_to_joint(list(msg.data))
-            self._move_jtj_pub.publish(Bool(data=ok))
+            check = self.move_joint_to_joint(list(msg.data))
+            self._move_jtj_pub.publish(Bool(data=check))
         except Exception as e:
             self.get_logger().error(f'Move J->J error: {e}')
 
@@ -188,8 +188,8 @@ class MairaKinematics(Node):
 
     def _move_linear_callback(self, msg: Float64MultiArray):
         try:
-            ok = self.move_linear(list(msg.data))
-            self._move_linear_pub.publish(Bool(data=ok))
+            check = self.move_linear(list(msg.data))
+            self._move_linear_pub.publish(Bool(data=check))
         except Exception as e:
             self.get_logger().error(f'Move linear error: {e}')
 
@@ -199,8 +199,8 @@ class MairaKinematics(Node):
         try:
             data = list(msg.data)
             poses = [data[i:i+6] for i in range(0, len(data), 6)]
-            ok = self.move_linear_via_points(poses)
-            self._move_lin_via_pub.publish(Bool(data=ok))
+            check = self.move_linear_via_points(poses)
+            self._move_lin_via_pub.publish(Bool(data=check))
         except Exception as e:
             self.get_logger().error(f'LinearVia error: {e}')
 
@@ -210,8 +210,8 @@ class MairaKinematics(Node):
         try:
             data = list(msg.data)
             pts = [data[i:i+self.num_joints] for i in range(0, len(data), self.num_joints)]
-            ok = self.move_joint_via_points(pts)
-            self._move_jnt_via_pub.publish(Bool(data=ok))
+            check = self.move_joint_via_points(pts)
+            self._move_jnt_via_pub.publish(Bool(data=check))
         except Exception as e:
             self.get_logger().error(f'JointVia error: {e}')
 
