@@ -186,29 +186,89 @@
 #     main()
 
 
-import rclpy # ros2 module imported 
-import cmd # imported cmd
+import rclpy  # ROS2 Python client library
 from rclpy.node import Node # imported Node
-from rclpy.action import ActionServer, GoalResponse, CancelResponse # imported Actionserver ,CancelResponse, GolaResponse 
+from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported Actionserver
+from sensor_msgs.msg import JointState # imported Jointstate
+from std_msgs.msg import Bool # imported Bool
+from control_msgs.action import FollowJointTrajectory # imported Joint Trajectory
+from trajectory_msgs.msg import JointTrajectoryPoint
 from typing import List, Optional
-from control_msgs.action import FollowJointTrajectory # importing the action server
-from maira_kinematics_ros import MairaKinematics # importing the mairakinematics
+import cmd_interface as cmd  # hypothetical command interface module
 
-# created class 
-class JointPathActionServer(Node):
+# created class for Mairakinematics
+
+class MairaKinematics:
+
+    def __init__(self,speed_move_joint=1.0, acc_move_joint=1.0):
+        self.num_joints = 7
+        self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]
+        self._current_joint_state: Optional[List[float]] = None
+        self.speed_move_joint = speed_move_joint
+        self.acc_move_joint = acc_move_joint
+
+    def move_joint_to_joint(
+        self,
+        goal_pose: List[float],
+        speed: Optional[float] = None,
+        acc: Optional[float] = None,
+    ) -> bool:
+        self.throw_if_joint_invalid(goal_pose)
+
+        props = {
+            'target_joint': [goal_pose],
+            'speed': self.speed_move_joint if speed is None else speed,
+            'acceleration': self.acc_move_joint if acc is None else acc,
+            'interpolator': 1,
+            'enable_blending': True,
+        }
+
+        plan_id = self._id_manager.update_id()
+        self._program.set_command(
+            cmd.Joint,
+            **props,
+            cmd_id=plan_id,
+            current_joint_angles=self.get_current_joint_state(),
+            reusable_id=0,
+        )
+
+        return self.execute_if_successful(plan_id)
+
+    def throw_if_joint_invalid(self, pose: List[float]):
+        expected = self.num_joints
+        if not isinstance(pose, list) or len(pose) != expected:
+            raise TypeError(f"Expected {expected} joint values, got {pose}")
+
+    def get_current_joint_state(self) -> List[float]:
+        if self._current_joint_state is None:
+            raise RuntimeError("Current joint state unknown")
+        return self._current_joint_state
+
+    def execute_if_successful(self, id: int) -> bool:
+        success = self._program.execute_plan(id)
+        if not success:
+            raise RuntimeError(f"Execution of plan {id} failed")
+        return True
+
+# crearted class for Action server 
+class CartesianToJointActionServer(Node):
+
     def __init__(self):
-        super().__init__('joint_path_action_server')
-        self.get_logger().info("Initializing the jointPath ActionServer...")
+        super().__init__('cartesian_to_joint_action_server')
+        self.get_logger().info('Initializing action server')
 
-
-        # Kinematics solver (to get current joint state)
+        # Kinematics + motion interface
         self._kin = MairaKinematics()
 
-        # Default speed and acceleration (percent)
-        self.speed_move_joint = 50
-        self.acc_move_joint = 50
+        # Subscriber for joint command requests
+        self._joint_sub = self.create_subscription(
+            JointState,
+            '/cmd_joint',
+            self.on_joint_cmd,
+            10,
+        )
 
-        # Action server for FollowJointTrajectory
+        # FollowJointTrajectory action server (optional)
         self._action_server = ActionServer(
             node=self,
             action_type=FollowJointTrajectory,
@@ -218,104 +278,92 @@ class JointPathActionServer(Node):
             cancel_callback=self.cancel_callback,
         )
 
-# function for goal_callback 
-    def goal_callback(self, goal_request) -> GoalResponse:
-        self.get_logger().info(f"Received goal with {len(goal_request.path)} waypoints")
-        return GoalResponse.ACCEPT
-
-# function for cancel_callback 
-    def cancel_callback(self, goal_handle) -> CancelResponse:
-        self.get_logger().info('Received request to cancel goal')
-        return CancelResponse.ACCEPT
-
-# function for executing the callback 
-    def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
-        path: List[List[float]] = goal_handle.request.path
-        total = len(path)
-
-        for idx, joint_positions in enumerate(path):
-
-            try:
-                success = self.move_joint_to_joint(joint_positions)
-                if not success:
-                    raise RuntimeError("move_joint_to_joint returned False")
-            except Exception as e:
-                goal_handle.abort()
-                result = FollowJointTrajectory.Result()
-                result.success = False
-                result.message = f"Failed at waypoint {idx}: {e}"
-                return result
-
-            feedback_msg = FollowJointTrajectory.Feedback()
-            feedback_msg.progress = float(idx + 1) / total
-            goal_handle.publish_feedback(feedback_msg)
-            self.get_logger().info(f"Waypoint {idx+1}/{total} done")
-
-# setting up the Result 
-        result = FollowJointTrajectory.Result()
-        result.success = True
-        result.message = "Completed all waypoints"
-        goal_handle.succeed()
-        return result
-
-# function for move_joint_to_joint 
-    def move_joint_to_joint(
-        self,
-        goal_pose: List[float],
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
-    ) -> bool:
-
-        self.throw_if_joint_invalid(goal_pose)
-
-        joint_property = {
-            "target_joint": [goal_pose],
-            "speed": self.speed_move_joint if speed is None else speed,
-            "acceleration": self.acc_move_joint if acc is None else acc,
-            "interpolator": 1,
-            "enable_blending": True,
-        }
-
-        plan_id = self._id_manager.update_id()
-        self._program.set_command(
-            cmd.Joint,
-            **joint_property,
-            cmd_id=plan_id,
-            current_joint_angles=self.get_current_joint_state(),
-            reusable_id=0,
+        # Track latest state from sensors
+        self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_state_cb,
+            10,
         )
 
-        return self.execute_if_successful(id=plan_id)
+    def on_joint_cmd(self, msg: JointState) -> None:
+        self.get_logger().info('Received joint command request')
+        try:
+            success = self._kin.move_joint_to_joint(list(msg.position))
+            print(success)
+        except Exception as e:
+            self.get_logger().error(f'Motion failed: {e}')
+            return
+        self.get_logger().info('Motion command completed successfully')
 
-# function for setting the throw if the joint is invalid or not 
-    def throw_if_joint_invalid(self, pose: List[float]):
-        expected = self._kin.num_joints
-        if not isinstance(pose, list) or len(pose) != expected:
-            raise TypeError(f"Expected {expected} joint values, got {pose}")
 
-# function for getting the current joint state
-    def get_current_joint_state(self) -> List[float]:
-        if self._kin._current_joint_state is None:
-            raise RuntimeError("Current joint state unknown")
-        return self._kin._current_joint_state
+    def joint_state_cb(self, msg: JointState) -> None:
+        self._kin._current_joint_state = list(msg.position)
 
-# function for executing (if successful or not)
-    def execute_if_successful(self, id: int) -> bool:
-        success = self._program.execute_plan(id)
-        if not success:
-            raise RuntimeError(f"Execution of plan {id} failed")
-        return True
+    def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
+        self.get_logger().info('FollowJointTrajectory goal received')
+        return GoalResponse.ACCEPT
 
-# main function
+    def cancel_callback(self, goal_handle) -> CancelResponse:
+        self.get_logger().info('Cancel request received')
+        return CancelResponse.ACCEPT
+
+    def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
+        self.get_logger().info('Executing trajectory…')
+        traj = goal_handle.request.trajectory
+        n = self._kin.num_joints
+
+        # Basic validation
+        if len(traj.joint_names) != n:
+            self.get_logger().error('Invalid # of joints')
+            goal_handle.abort()
+            res = FollowJointTrajectory.Result()
+            res.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
+            return res
+
+        for idx, pt in enumerate(traj.points):
+            if len(pt.positions) != n:
+                self.get_logger().error('Point length mismatch')
+                goal_handle.abort()
+                r = FollowJointTrajectory.Result()
+                r.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                return r
+
+        # Sequentially execute each waypoint
+        prev_t = 0.0
+        for idx, pt in enumerate(traj.points):
+            t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
+            dt = t - prev_t
+            if dt > 0:
+                self.move_delay(dt)
+            feedback = FollowJointTrajectory.Feedback(
+                joint_names=traj.joint_names,
+                desired=pt,
+                actual=pt,
+                error=JointTrajectoryPoint(),
+            )
+            goal_handle.publish_feedback(feedback)
+            prev_t = t
+
+        # Success
+        goal_handle.succeed()
+        result = FollowJointTrajectory.Result()
+        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+        return result
+
+    def move_delay(self, dt: float):
+        # simple blocking delay; consider a non-blocking timer for production
+        import time
+        time.sleep(dt)
+
+
 def main(args=None):
     rclpy.init(args=args)
-    node = JointPathActionServer()
+    server = CartesianToJointActionServer()
     try:
-        rclpy.spin(node)
+        rclpy.spin(server)
+    except KeyboardInterrupt:
+        server.get_logger().info('Shutting down')
     finally:
-        node.destroy_node()
+        server.destroy_node()
         rclpy.shutdown()
-
-# calling the main function 
-if __name__ == '__main__':
-    main()
