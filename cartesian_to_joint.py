@@ -185,20 +185,21 @@
 # if __name__ == '__main__':
 #     main()
 
+
 import rclpy # ros2 module imported 
 import cmd # imported cmd
 from rclpy.node import Node # imported Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse # imported Actionserver ,CancelResponse, GolaResponse 
 from typing import List, Optional
-
 from control_msgs.action import FollowJointTrajectory # importing the action server
-from maira_kinematics_ros import MairaKinematics
+from maira_kinematics_ros import MairaKinematics # importing the mairakinematics
 
 # created class 
 class JointPathActionServer(Node):
     def __init__(self):
         super().__init__('joint_path_action_server')
-        self.get_logger().info('Initializing JointPathActionServer')
+        self.get_logger().info("Initializing the jointPath ActionServer...")
+
 
         # Kinematics solver (to get current joint state)
         self._kin = MairaKinematics()
@@ -217,14 +218,17 @@ class JointPathActionServer(Node):
             cancel_callback=self.cancel_callback,
         )
 
+# function for goal_callback 
     def goal_callback(self, goal_request) -> GoalResponse:
         self.get_logger().info(f"Received goal with {len(goal_request.path)} waypoints")
         return GoalResponse.ACCEPT
 
+# function for cancel_callback 
     def cancel_callback(self, goal_handle) -> CancelResponse:
         self.get_logger().info('Received request to cancel goal')
         return CancelResponse.ACCEPT
 
+# function for executing the callback 
     def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
         path: List[List[float]] = goal_handle.request.path
         total = len(path)
@@ -264,7 +268,6 @@ class JointPathActionServer(Node):
 
         self.throw_if_joint_invalid(goal_pose)
 
-
         joint_property = {
             "target_joint": [goal_pose],
             "speed": self.speed_move_joint if speed is None else speed,
@@ -284,17 +287,19 @@ class JointPathActionServer(Node):
 
         return self.execute_if_successful(id=plan_id)
 
-
+# function for setting the throw if the joint is invalid or not 
     def throw_if_joint_invalid(self, pose: List[float]):
         expected = self._kin.num_joints
         if not isinstance(pose, list) or len(pose) != expected:
             raise TypeError(f"Expected {expected} joint values, got {pose}")
 
+# function for getting the current joint state
     def get_current_joint_state(self) -> List[float]:
         if self._kin._current_joint_state is None:
             raise RuntimeError("Current joint state unknown")
         return self._kin._current_joint_state
 
+# function for executing (if successful or not)
     def execute_if_successful(self, id: int) -> bool:
         success = self._program.execute_plan(id)
         if not success:
