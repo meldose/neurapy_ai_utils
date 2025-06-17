@@ -189,12 +189,12 @@
 import rclpy  # ROS2 Python client library
 from rclpy.node import Node  # imported Node module  
 from rclpy.executors import MultiThreadedExecutor # imported module  
-from rclpy.action import ActionServer, CancelResponse, GoalResponse 
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from sensor_msgs.msg import JointState # imported the jointstate
 from geometry_msgs.msg import PoseStamped  #imported Posestamed module
 from control_msgs.action import FollowJointTrajectory # imported ros2 action module 
 from trajectory_msgs.msg import JointTrajectoryPoint # imported module  
-from typing import List, Optional # imported module  
+from typing import List, Optional,Tuple # imported module  
 import cmd_interface as cmd  # hypothetical command interface module
 
 # class Mairakinematics
@@ -272,7 +272,7 @@ class MairaKinematics:
         return True
 
 # class Actionserver
-class CartesianToJointActionServer(Node):
+class MovejointtoJOintActionServer(Node):
     """
     ROS2 node that accepts PoseStamped commands whose position (x,y,z)
     plus orientation (x,y,z,w) together encode a 7-element joint target,
@@ -418,10 +418,10 @@ class CartesianToJointActionServer(Node):
         time.sleep(dt)
 
 # main function 
-def main(args=None) -> None:
-    rclpy.init(args=args)
-    node = CartesianToJointActionServer()
+def main(args=None):
 
+    rclpy.init(args=args)
+    node = MovejointtoJOintActionServer()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
