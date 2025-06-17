@@ -209,7 +209,7 @@ class MairaKinematics:
     ):
         self.num_joints: int = 7
         self.joint_names: List[str] = [
-            f'joint{i+1}' for i in range(self.num_joints)
+            f'joint{i+1}' for i in range(self.num_joints) # setting up the joint names 
         ]
         self._current_joint_state: Optional[List[float]] = None
         self.speed_move_joint: float = speed_move_joint
@@ -230,7 +230,7 @@ class MairaKinematics:
         self.throw_if_joint_invalid(goal_pose)
         plan_id: int = self._id_manager.update_id()
 
-        props = {
+        properties = {
             'target_joint': [goal_pose],
             'speed': self.speed_move_joint if speed is None else speed,
             'acceleration': self.acc_move_joint if acc is None else acc,
@@ -240,7 +240,7 @@ class MairaKinematics:
 
         self._program.set_command(
             cmd.Joint,
-            **props,
+            **properties,
             cmd_id=plan_id,
             current_joint_angles=self.get_current_joint_state(),
             reusable_id=0
@@ -297,7 +297,7 @@ class CartesianToJointActionServer(Node):
         self.create_subscription(
             JointState,
             '/joint_states',
-            self.joint_state_cb,
+            self.joint_state_callback,
             10
         )
 
@@ -335,11 +335,11 @@ class CartesianToJointActionServer(Node):
             self.get_logger().error(f'Motion failed: {e}')
 
 # joint state callback
-    def joint_state_cb(self, msg: JointState) -> None:
+    def joint_state_callback(self, msg: JointState) -> None:
         """Update the cached current joint state from sensors."""
         self._kin._current_joint_state = list(msg.position)
 
-
+# function for callback
     def goal_callback(
         self,
         goal_request: FollowJointTrajectory.Goal
