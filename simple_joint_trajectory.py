@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer
-from control_msgs.action import FollowJointTrajectory
-from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectoryPoint 
-from std_msgs.msg import Header
-import time
-from typing import List, Optional
+import rclpy  # imported rclpy module 
+from rclpy.node import Node # imported Node module 
+from rclpy.action import ActionServer # imported Actionserver module 
+from control_msgs.action import FollowJointTrajectory # imported FollowJointTrajecotry module 
+from sensor_msgs.msg import JointState # imported Joinstate module 
+from trajectory_msgs.msg import JointTrajectoryPoint  # imported JointTrajectoryPoint module 
+from std_msgs.msg import Header # imported Header module 
+import time # imported time module 
+from typing import List, Optional # imported List, Optional ,Tuple module 
 
 #from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 from neurapy_ai_utils.functions.utils import init_logger
 
-import sys
+import sys #imported sys 
 sys.path.append("/home/neura/neurapy_alpha/")
-import neurapy
-from neurapy.robot import Robot
+import neurapy # imported neurapy 
 
+from neurapy.robot import Robot # importing the neurayp modules
+
+# class MairaKinematics
 class MairaKinematics(Node):
     def __init__(self, joint_names_param: List[str],
                  id_manager: int = 0, 
@@ -55,11 +57,12 @@ class MairaKinematics(Node):
         self._robot = Robot()
         self._logger.info("[MairaKinematics]: init success.")
 
+# function for move joint to joint 
     def move_joint_to_joint(
         self,
-        goal_pose: List[float],
-        speed: Optional[int] = None,
-        acc: Optional[int] = None,
+        goal_pose: List[float], # initialising the goal_pose
+        speed: Optional[int] = None, # initialising the speed
+        acc: Optional[int] = None, # initialising the acceleration
     ) -> bool:
         """Move the robot's joints to a specified joint configuration.
 
@@ -114,6 +117,7 @@ class MairaKinematics(Node):
             success = False
         return success
 
+# function for move joint through points
     def move_joint_via_points(
         self,
         trajectory: List[List[float]],
@@ -173,9 +177,11 @@ class MairaKinematics(Node):
             success = False
         return success
 
+# function for getting current joint state
     def get_current_joint_state(self) -> List[float]:
         return self._robot.get_current_joint_angles()
 
+# function for waiting the moition to finish 
     def wait_motion_finish(self, target: List[float], threshold: float = 0.01, timeout: float = 50.0, rate: float = 10.0) -> bool:
         """
         Waits until all joint values are within the threshold between current and target positions.
@@ -201,6 +207,7 @@ class MairaKinematics(Node):
             time.sleep(period)
         return False
 
+# function to check if the joint is invalid or not 
     def _throw_if_joint_invalid(self, joint_states: List[float]) -> None:
         """Raise an error if the given joint states are invalid.
 
@@ -232,6 +239,7 @@ class MairaKinematics(Node):
                 f"[ERROR] joint_states should be a list with length {self.num_joints}!"
             )
 
+# created Action Server 
 class SimpleJointTrajectoryServer(Node):
     """Simplified ROS2 Action Server for joint trajectory control using MairaKinematics."""
 
