@@ -32,8 +32,7 @@ class MairaKinematics:
         goal = [pos.x, pos.y, pos.z, ori.x, ori.y, ori.z, ori.w]
         try:
             # Replace this with your actual IK logic
-            # For now, return dummy values as placeholder
-            return [0.0] * self.num_joints
+            return [0.0] * self.num_joints  # Dummy IK solution
         except Exception as e:
             print(f"IK computation failed: {e}")
             return None
@@ -103,16 +102,10 @@ class CartesianToJointActionServer(Node):
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
-        self.get_logger().info('Executing trajectory')
+        self.get_logger().info('Executing Cartesian trajectory via IK')
+
         traj = goal_handle.request.trajectory
         n = self._kin.num_joints
-
-        if len(traj.joint_names) != n:
-            self.get_logger().error(f'Expected {n} joints, got {len(traj.joint_names)}')
-            goal_handle.abort()
-            result = FollowJointTrajectory.Result()
-            result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-            return result
 
         if not traj.points:
             self.get_logger().error('Received trajectory with no points.')
@@ -121,33 +114,60 @@ class CartesianToJointActionServer(Node):
             result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
             return result
 
+        joint_trajectory_points = []
         for idx, pt in enumerate(traj.points):
-            if len(pt.positions) != n:
-                self.get_logger().error(f'Point #{idx} wrong size: {len(pt.positions)}')
+            if len(pt.positions) != 7:
+                self.get_logger().error(f'Point #{idx} is not a valid Cartesian pose (expected 7 values)')
                 goal_handle.abort()
                 result = FollowJointTrajectory.Result()
                 result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
                 return result
 
+            # Convert Cartesian to PoseStamped
+            pose_msg = PoseStamped()
+            pose_msg.header.stamp = self.get_clock().now().to_msg()
+            pose_msg.header.frame_id = 'base_link'
+            pose_msg.pose.position.x = pt.positions[0]
+            pose_msg.pose.position.y = pt.positions[1]
+            pose_msg.pose.position.z = pt.positions[2]
+            pose_msg.pose.orientation.x = pt.positions[3]
+            pose_msg.pose.orientation.y = pt.positions[4]
+            pose_msg.pose.orientation.z = pt.positions[5]
+            pose_msg.pose.orientation.w = pt.positions[6]
+
+            joint_positions = self._kin.cartesian_to_joint(pose_msg)
+            if joint_positions is None:
+                self.get_logger().error(f'IK failed for point #{idx}')
+                goal_handle.abort()
+                result = FollowJointTrajectory.Result()
+                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                return result
+
+            joint_point = JointTrajectoryPoint()
+            joint_point.positions = joint_positions
+            joint_point.time_from_start = pt.time_from_start
+            joint_trajectory_points.append(joint_point)
+
+        # Simulated execution using time.sleep
         prev_t = 0.0
-        for idx, pt in enumerate(traj.points):
+        for idx, pt in enumerate(joint_trajectory_points):
             t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
             dt = t - prev_t
             if dt > 0.0:
                 time.sleep(dt)
             feedback = FollowJointTrajectory.Feedback()
-            feedback.joint_names = traj.joint_names
+            feedback.joint_names = self._kin.joint_names
             feedback.desired = pt
             feedback.actual = pt
             feedback.error = JointTrajectoryPoint()
             goal_handle.publish_feedback(feedback)
-            self.get_logger().debug(f'Sent feedback for point {idx}')
             prev_t = t
+            self.get_logger().debug(f'Executed IK for point #{idx}')
 
         result = FollowJointTrajectory.Result()
         result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         goal_handle.succeed()
-        self.get_logger().info('Trajectory execution completed successfully')
+        self.get_logger().info('IK-based trajectory execution completed successfully')
         return result
 
 
@@ -165,5 +185,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
