@@ -9,7 +9,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 from typing import List, Optional
 import time
 
-
+# class for Mairakinematics
 class MairaKinematics:
 
     def __init__(self):
@@ -37,7 +37,7 @@ class MairaKinematics:
             print(f"IK computation failed: {e}")
             return None
 
-
+# class Cartesina to joint Action server 
 class CartesianToJointActionServer(Node):
 
     def __init__(self):
@@ -55,6 +55,7 @@ class CartesianToJointActionServer(Node):
             JointState, '/joint_states', self.joint_state, 10)
         self._latest_state: Optional[JointState] = None
 
+# created ActionServer 
         self._action_server = ActionServer(
             self,
             FollowJointTrajectory,
@@ -64,6 +65,7 @@ class CartesianToJointActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
+# callback for fucntion cartesian to joint conversion
     def on_pose_msg(self, msg: PoseStamped) -> None:
         self.get_logger().info('Received Cartesian pose')
         joint_positions = self._kin.cartesian_to_joint(msg)
@@ -79,6 +81,7 @@ class CartesianToJointActionServer(Node):
         self._joint_pub.publish(js)
         self.get_logger().info(f'Published IK joint positions: {joint_positions}')
 
+# function for joint states
     def joint_state(self, msg: JointState) -> None:
         if len(msg.position) != self._kin.num_joints:
             self.get_logger().warn('Received joint state of unexpected size.')
@@ -92,6 +95,8 @@ class CartesianToJointActionServer(Node):
         flag = Bool()
         flag.data = True
         self._flag_pub.publish(flag)
+
+# callback functions 
 
     def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
         self.get_logger().info('Received FollowJointTrajectory goal request')
@@ -113,7 +118,7 @@ class CartesianToJointActionServer(Node):
             result = FollowJointTrajectory.Result()
             result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
             return result
-
+        
         joint_trajectory_points = []
         for idx, pt in enumerate(traj.points):
             if len(pt.positions) != 7:
@@ -170,7 +175,7 @@ class CartesianToJointActionServer(Node):
         self.get_logger().info('IK-based trajectory execution completed successfully')
         return result
 
-
+# main function 
 def main(args=None):
     rclpy.init(args=args)
     server = CartesianToJointActionServer()
@@ -182,6 +187,6 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
 
-
+# calling the main function 
 if __name__ == '__main__':
     main()
