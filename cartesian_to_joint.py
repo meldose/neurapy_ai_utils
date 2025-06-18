@@ -1,3 +1,68 @@
+<<<<<<< HEAD
+=======
+import os # imported os module
+import numpy as np # imported numpy module
+
+import rclpy # imported rclpy
+from rclpy.node import Node # imported Node
+from rclpy.action import ActionClient #imported Actionclient
+
+from control_msgs.action import FollowJointTrajectory # imported FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectoryPoint # imported JoinTrajectory
+from sensor_msgs.msg import JointState #imported Joinstate
+from builtin_interfaces.msg import Duration # imported Duration
+
+from ikpy.chain import Chain # imported ik
+
+# created class for URDF handler
+class URDFChainHandler:
+    def __init__(self, urdf_path: str, base_link: str = "maira7M_root_link"):
+        self.urdf_path = urdf_path # defining the urdf path
+        self.base_link = base_link # defining the base link
+        self.chain = None # defing the chain for ik 
+
+# function for loading chain
+    def load_chain(self):
+        if not os.path.isfile(self.urdf_path): # checking the urdf path 
+            raise FileNotFoundError(f"URDF file not found: {self.urdf_path}") # raise the error 
+        self.chain = Chain.from_urdf_file(
+            self.urdf_path,
+            base_elements=[self.base_link]
+        )
+
+        # Hard‐coded printout for indices 2..8 → maira7M_joint1..maira7M_joint7
+        print("[URDFChainHandler] Hard coded joint indices:")
+        for i in range(2, 9):  # i = 2, 3, ..., 8
+            print(f"  {i}: maira7M_joint{i-1}")
+
+
+    def load_chain(self):
+
+        if not os.path.isfile(self.urdf_path):
+            raise FileNotFoundError(f"URDF file not found {self.urdf_path}")
+        self.chain=Chain.from_urdf_file(self.urdf_path,base_elements=[self.base_link])
+
+
+# created function for inverse kinematics
+
+    def inverse_kinematics(self, target_position: np.ndarray,
+                           initial_joints: np.ndarray = None) -> np.ndarray:
+        if not self.chain:
+            raise RuntimeError("Chain is not loaded. Call load_chain() first.")
+        if initial_joints is None:
+            initial_joints = np.zeros(len(self.chain.links))
+
+        full_solution = self.chain.inverse_kinematics(
+            target_position,
+            initial_position=initial_joints
+        )
+
+        print("[URDFChainHandler] Raw IK solution (one value per link):")
+        for i, angle in enumerate(full_solution):
+            print(f"  Joint {i} ({self.chain.links[i].name}): {angle:.4f} rad")
+
+        return full_solution
+>>>>>>> a432df0a2adf143af36b4f28db9e8b56054a1049
 
 # import rclpy  # imported rclpy module 
 # from rclpy.node import Node # imported Node module 
