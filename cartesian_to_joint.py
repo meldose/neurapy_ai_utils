@@ -34,6 +34,13 @@ class URDFChainHandler:
             print(f"  {i}: maira7M_joint{i-1}")
 
 
+    def load_chain(self):
+
+        if not os.path.isfile(self.urdf_path):
+            raise FileNotFoundError(f"URDF file not found {self.urdf_path}")
+        self.chain=Chain.from_urdf_file(self.urdf_path,base_elements=[self.base_link])
+
+
 # created function for inverse kinematics
 
     def inverse_kinematics(self, target_position: np.ndarray,
