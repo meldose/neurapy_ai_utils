@@ -1,193 +1,255 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool
+from rclpy.action import ActionServer
 from control_msgs.action import FollowJointTrajectory
-from trajectory_msgs.msg import JointTrajectoryPoint
-from typing import List, Optional
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Header
 import time
+import traceback
+from typing import List, Optional
 
-# class for Mairakinematics
-class MairaKinematics:
+from neurapy.robot import Robot
 
-    def __init__(self):
-        self.num_joints = 7
-        self.joint_names = [f'joint{i+1}' for i in range(self.num_joints)]
-        self._current_joint_state: Optional[List[float]] = None
+
+class MairaKinematics(Node):
+    def __init__(
+        self,
+        joint_names_param: List[str],
+        id_manager: int = 0,
+        speed_move_joint: int = 20,
+        speed_move_linear: float = 0.1,
+        rot_speed_move_linear: float = 0.87266463,
+        acc_move_joint: int = 20,
+        acc_move_linear: float = 0.1,
+        rot_acc_move_linear: float = 1.74532925,
+        blending_radius: float = 0.005,
+        require_elbow_up: bool = True,
+    ):
+        super().__init__('maira_kinematics')
+        self._logger = self.get_logger()
+
+        # Joint names
+        if not joint_names_param:
+            self._joint_names = [f'joint{i+1}' for i in range(7)]
+            self._logger.info("Using default joint names")
+        else:
+            self._joint_names = joint_names_param
+        self.num_joints = len(self._joint_names)
+
+        # Motion parameters
+        self.id_manager = id_manager
+        self.speed_move_joint = speed_move_joint
+        self.speed_move_linear = speed_move_linear
+        self.rot_speed_move_linear = rot_speed_move_linear
+        self.acc_move_joint = acc_move_joint
+        self.acc_move_linear = acc_move_linear
+        self.rot_acc_move_linear = rot_acc_move_linear
+        self.blending_radius = blending_radius
+        self.require_elbow_up = require_elbow_up
+
+        # Robot interface
+        self._robot = Robot()
+        self._logger.info("[MairaKinematics]: initialization complete.")
 
     def _get_current_joint_state(self) -> List[float]:
-        if self._current_joint_state is None:
-            raise ValueError("Current joint state not available")
-        return self._current_joint_state
+        return self._robot.get_current_joint_angles()
 
-    def cartesian_to_joint(self, pose_msg: PoseStamped) -> Optional[List[float]]:
-        """
-        Replace this method's logic with your IK solver.
-        This method receives a PoseStamped and returns joint angles.
-        """
-        pos = pose_msg.pose.position
-        ori = pose_msg.pose.orientation
-        goal = [pos.x, pos.y, pos.z, ori.x, ori.y, ori.z, ori.w]
+    def _get_current_cartesian_pose(self) -> List[float]:
+        return self._robot.get_current_cartesian_pose()
+
+    def _throw_if_pose_invalid(self, pose: List[float]) -> None:
+        if not (isinstance(pose, list) and len(pose) == 6):
+            raise TypeError("[ERROR] goal_pose should be a list of 6 floats [x,y,z,rx,ry,rz]")
+
+    def _throw_if_list_poses_invalid(self, poses: List[List[float]]) -> None:
+        if not (isinstance(poses, list) and all(isinstance(p, list) and len(p) == 6 for p in poses)):
+            raise TypeError("[ERROR] goal_poses should be a list of 6-element lists")
+
+    def wait_motion_finish(
+        self,
+        target: List[float],
+        threshold: float = 0.01,
+        timeout: float = 50.0,
+        rate: float = 10.0
+    ) -> bool:
+        start_time = time.time()
+        period = 1.0 / rate
+
+        while time.time() - start_time < timeout:
+            current = self._get_current_cartesian_pose()
+            if all(abs(c - t) <= threshold for c, t in zip(current, target)):
+                return True
+            time.sleep(period)
+        return False
+
+    def move_linear(
+        self,
+        goal_pose: List[float],
+        speed: Optional[float] = None,
+        acc: Optional[float] = None,
+        rot_speed: Optional[float] = None,
+        rot_acc: Optional[float] = None,
+    ) -> bool:
+        """Execute a Cartesian linear move to the specified pose."""
+        self._throw_if_pose_invalid(goal_pose)
+
+        self.id_manager += 1
+        motion_id = self.id_manager
+
+        props = {
+            "target_pose": goal_pose,
+            "speed": self.speed_move_linear if speed is None else speed,
+            "acceleration": self.acc_move_linear if acc is None else acc,
+            "rotational_speed": self.rot_speed_move_linear if rot_speed is None else rot_speed,
+            "rotational_acceleration": self.rot_acc_move_linear if rot_acc is None else rot_acc,
+            "blend_radius": 0.0,
+        }
+
         try:
-            # Replace this with your actual IK logic
-            return [0.0] * self.num_joints  # Dummy IK solution
-        except Exception as e:
-            print(f"IK computation failed: {e}")
-            return None
+            # Use the robot’s Cartesian move API
+            self._robot.move_linear(**props, motion_id=motion_id)
+            return self.wait_motion_finish(target=goal_pose)
+        except Exception:
+            self._logger.error(traceback.format_exc())
+            return False
 
-# class Cartesina to joint Action server 
-class CartesianToJointActionServer(Node):
+    def move_linear_via_points(
+        self,
+        goal_poses: List[List[float]],
+        speed: Optional[float] = None,
+        acc: Optional[float] = None,
+        rot_speed: Optional[float] = None,
+        rot_acc: Optional[float] = None,
+        blending_radius: Optional[float] = None,
+    ) -> bool:
+        """Execute a Cartesian linear move through multiple poses."""
+        self._throw_if_list_poses_invalid(goal_poses)
+        self.id_manager += 1
+        motion_id = self.id_manager
 
+        waypoints = [self._get_current_cartesian_pose()] + goal_poses
+        props = {
+            "target_pose": waypoints,
+            "speed": self.speed_move_linear if speed is None else speed,
+            "acceleration": self.acc_move_linear if acc is None else acc,
+            "rotational_speed": self.rot_speed_move_linear if rot_speed is None else rot_speed,
+            "rotational_acceleration": self.rot_acc_move_linear if rot_acc is None else rot_acc,
+            "blend_radius": self.blending_radius if blending_radius is None else blending_radius,
+        }
+
+        try:
+            self._robot.move_linear(**props, motion_id=motion_id)
+            return self.wait_motion_finish(target=goal_poses[-1])
+        except Exception:
+            self._logger.error(traceback.format_exc())
+            return False
+
+
+class TestJointTrajectoryServer(Node):
+    """ROS2 Action Server that dispatches Cartesian linear moves based on FollowJointTrajectory requests."""
     def __init__(self):
-        super().__init__('cartesian_to_joint_action_server')
-        self.get_logger().info('Initializing Cartesian→Joint action server')
+        super().__init__('test_joint_trajectory_server')
+        self._logger = self.get_logger()
 
-        self._kin = MairaKinematics()
-        self._joint_pub = self.create_publisher(JointState, '/ik_joint_states', 10)
-        self._flag_pub = self.create_publisher(Bool, '/joint_state_received_flag', 10)
+        # Parameters
+        self.declare_parameter('joint_names',
+                               ['joint1','joint2','joint3','joint4','joint5','joint6','joint7'])
+        self.declare_parameter('action_name', 'follow_joint_trajectory')
+        joint_names = self.get_parameter('joint_names')\
+                          .get_parameter_value().string_array_value
+        action_name = self.get_parameter('action_name')\
+                         .get_parameter_value().string_value
 
-        self._pose_sub = self.create_subscription(
-            PoseStamped, '/cmd_pose', self.on_pose_msg, 10)
-
-        self._joint_state_sub = self.create_subscription(
-            JointState, '/joint_states', self.joint_state, 10)
-        self._latest_state: Optional[JointState] = None
-
-# created ActionServer 
+        # Kinematics & action server
+        self._maira_kin = MairaKinematics(joint_names_param=joint_names)
         self._action_server = ActionServer(
             self,
             FollowJointTrajectory,
-            'joint_trajectory_position_controller/follow_joint_trajectory',
-            execute_callback=self.execute_callback,
-            goal_callback=self.goal_callback,
-            cancel_callback=self.cancel_callback
+            action_name,
+            self._execute_callback
         )
 
-# callback for fucntion cartesian to joint conversion
-    def on_pose_msg(self, msg: PoseStamped) -> None:
-        self.get_logger().info('Received Cartesian pose')
-        joint_positions = self._kin.cartesian_to_joint(msg)
-        if joint_positions is None:
-            self.get_logger().error('IK failed: could not compute joint positions')
-            return
+        # Joint state publisher at 50Hz
+        self._state_pub = self.create_publisher(JointState, '/internal_kin_joint_states', 10)
+        self.create_timer(0.02, self._publish_joint_states)
 
-        js = JointState()
-        js.header.stamp = self.get_clock().now().to_msg()
-        js.header.frame_id = 'base_link'
-        js.name = self._kin.joint_names
-        js.position = joint_positions
-        self._joint_pub.publish(js)
-        self.get_logger().info(f'Published IK joint positions: {joint_positions}')
+        self._logger.info("Simple Joint Trajectory Action Server initialized.")
 
-# function for joint states
-    def joint_state(self, msg: JointState) -> None:
-        if len(msg.position) != self._kin.num_joints:
-            self.get_logger().warn('Received joint state of unexpected size.')
-            return
-
-        self._latest_state = msg
-        self._kin._current_joint_state = list(msg.position)
-        pos_str = ', '.join(f'{n}={p:.3f}' for n, p in zip(msg.name, msg.position))
-        self.get_logger().debug(f'Received joint states → {pos_str}')
-
-        flag = Bool()
-        flag.data = True
-        self._flag_pub.publish(flag)
-
-# callback functions 
-
-    def goal_callback(self, goal_request: FollowJointTrajectory.Goal) -> GoalResponse:
-        self.get_logger().info('Received FollowJointTrajectory goal request')
-        return GoalResponse.ACCEPT
-
-    def cancel_callback(self, goal_handle) -> CancelResponse:
-        self.get_logger().info('Cancel request received')
-        return CancelResponse.ACCEPT
-
-    def execute_callback(self, goal_handle) -> FollowJointTrajectory.Result:
-        self.get_logger().info('Executing Cartesian trajectory via IK')
-
+    def _execute_callback(self, goal_handle):
+        self._logger.info('Received trajectory goal.')
         traj = goal_handle.request.trajectory
-        n = self._kin.num_joints
 
-# condition if the trajectory points are not recieved properly
+        # Validate
         if not traj.points:
-            self.get_logger().error('Received trajectory with no points.')
+            self._logger.error('Empty trajectory')
             goal_handle.abort()
+            return FollowJointTrajectory.Result()
+
+        if len(traj.joint_names) != self._maira_kin.num_joints:
+            self._logger.error('Joint count mismatch')
+            goal_handle.abort()
+            return FollowJointTrajectory.Result()
+
+        # Convert to list-of-lists
+        poses = [list(p.positions) for p in traj.points]
+
+        # Dispatch to linear motion
+        try:
+            if len(poses) == 1:
+                success = self._maira_kin.move_linear(poses[0])
+            else:
+                success = self._maira_kin.move_linear_via_points(poses)
+
             result = FollowJointTrajectory.Result()
-            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            if success:
+                self._logger.info('Motion succeeded')
+                result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+                goal_handle.succeed()
+            else:
+                self._logger.error('Motion failed')
+                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+                goal_handle.abort()
             return result
-        
-        joint_trajectory_points = []
-        for idx, pt in enumerate(traj.points):
-            if len(pt.positions) != 7:
-                self.get_logger().error(f'Point #{idx} is not a valid Cartesian pose (expected 7 values)')
-                goal_handle.abort()
-                result = FollowJointTrajectory.Result()
-                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-                return result
 
-            # Convert Cartesian to PoseStamped
-            pose_msg = PoseStamped()
-            pose_msg.header.stamp = self.get_clock().now().to_msg()
-            pose_msg.header.frame_id = 'base_link'
-            pose_msg.pose.position.x = pt.positions[0]
-            pose_msg.pose.position.y = pt.positions[1]
-            pose_msg.pose.position.z = pt.positions[2]
-            pose_msg.pose.orientation.x = pt.positions[3]
-            pose_msg.pose.orientation.y = pt.positions[4]
-            pose_msg.pose.orientation.z = pt.positions[5]
-            pose_msg.pose.orientation.w = pt.positions[6]
+        except Exception:
+            self._logger.error(traceback.format_exc())
+            goal_handle.abort()
+            res = FollowJointTrajectory.Result()
+            res.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            return res
 
-            joint_positions = self._kin.cartesian_to_joint(pose_msg)
-            if joint_positions is None:
-                self.get_logger().error(f'IK failed for point #{idx}')
-                goal_handle.abort()
-                result = FollowJointTrajectory.Result()
-                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-                return result
+    def _publish_joint_states(self):
+        try:
+            positions = self._maira_kin._get_current_joint_state()
+            msg = JointState()
+            msg.header = Header()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.name = self._maira_kin._joint_names
+            msg.position = positions
+            msg.velocity = [0.0] * len(positions)
+            msg.effort = [0.0] * len(positions)
+            self._state_pub.publish(msg)
+        except Exception:
+            self._logger.error(traceback.format_exc())
 
-            joint_point = JointTrajectoryPoint()
-            joint_point.positions = joint_positions
-            joint_point.time_from_start = pt.time_from_start
-            joint_trajectory_points.append(joint_point)
+    def destroy_node(self):
+        self._logger.info('Shutting down server')
+        if hasattr(self._maira_kin, 'finish'):
+            self._maira_kin.finish()
+        super().destroy_node()
 
-        # Simulated execution using time.sleep
-        prev_t = 0.0
-        for idx, pt in enumerate(joint_trajectory_points):
-            t = pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9
-            dt = t - prev_t
-            if dt > 0.0:
-                time.sleep(dt)
-            feedback = FollowJointTrajectory.Feedback()
-            feedback.joint_names = self._kin.joint_names
-            feedback.desired = pt
-            feedback.actual = pt
-            feedback.error = JointTrajectoryPoint()
-            goal_handle.publish_feedback(feedback)
-            prev_t = t
-            self.get_logger().debug(f'Executed IK for point #{idx}')
 
-        result = FollowJointTrajectory.Result()
-        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
-        goal_handle.succeed()
-        self.get_logger().info('IK-based trajectory execution completed successfully')
-        return result
-
-# main function 
 def main(args=None):
     rclpy.init(args=args)
-    server = CartesianToJointActionServer()
+    server = TestJointTrajectoryServer()
     try:
         rclpy.spin(server)
     except KeyboardInterrupt:
-        server.get_logger().info('Shutting down...')
+        pass
     finally:
         server.destroy_node()
         rclpy.shutdown()
 
-# calling the main function 
+
 if __name__ == '__main__':
     main()
