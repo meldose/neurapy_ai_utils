@@ -61,6 +61,7 @@ class CartesiantoJoint(Node):
     def __init__(self, joint_names: list[str], goal_angles: np.ndarray, duration: float):
         super().__init__('move_joint_to_joint_client')
 
+# creating and Action client 
         self._client = ActionClient(
             self,
             FollowJointTrajectory,
@@ -168,9 +169,7 @@ class CartesiantoJoint(Node):
 def normalize_to_pi(angles: np.ndarray) -> np.ndarray:
     return (angles + np.pi) % (2.0 * np.pi) - np.pi
 
-
-#  creating main function :
-
+#  main function :
 def main(args=None):
     rclpy.init(args=args)
 
@@ -207,6 +206,6 @@ def main(args=None):
     rclpy.spin(node)
     rclpy.shutdown()
 
-
+# callig the main function 
 if __name__ == "__main__":
     main()
