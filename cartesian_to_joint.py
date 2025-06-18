@@ -187,6 +187,7 @@
 
 
 import rclpy  # ROS2 Python client library
+import time # imported time module 
 from rclpy.node import Node  # imported Node module  
 from rclpy.executors import MultiThreadedExecutor # imported module  
 from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported 
@@ -204,16 +205,16 @@ class MairaKinematics:
     """
     def __init__(
         self,
-        speed_move_joint: float = 1.0,
-        acc_move_joint: float = 1.0
+        speed_move_joint: float = 1.0, #setting up the move joint 
+        acc_move_joint: float = 1.0 # setting up the acceleration of the move joint 
     ):
-        self.num_joints: int = 7
+        self.num_joints: int = 7 # DOF
         self.joint_names: List[str] = [
             f'joint{i+1}' for i in range(self.num_joints) # setting up the joint names ["joint1","joint2",.....]
         ]
-        self._current_joint_state: Optional[List[float]] = None
-        self.speed_move_joint: float = speed_move_joint
-        self.acc_move_joint: float = acc_move_joint
+        self._current_joint_state: Optional[List[float]] = None # creating the current joint state
+        self.speed_move_joint: float = speed_move_joint #  setting the speed of the move joint
+        self.acc_move_joint: float = acc_move_joint # setting the acceleration of the move joint 
 
         # Initialize command interface and ID manager
         self._program: cmd.ProgramInterface = cmd.ProgramInterface()
@@ -362,6 +363,7 @@ class MovejointtoJointActionServer(Node):
 
         return GoalResponse.ACCEPT
 
+# function for CALLBACKS
     def cancel_callback(self, goal_handle) -> CancelResponse:
         """Accept all cancel requests."""
         self.get_logger().info('Cancel request received')
@@ -415,12 +417,13 @@ class MovejointtoJointActionServer(Node):
         result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         return result
 
+# function for move_delay
     def move_delay(self, dt: float) -> None:
         """
         Blocking delay—executed in its own thread under MultiThreadedExecutor,
         so other callbacks (e.g., cancel) remain responsive.
         """
-        import time
+
         time.sleep(dt)
 
 # main function 
