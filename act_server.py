@@ -107,6 +107,7 @@ class CartesianToJointActionServer(Node):
         traj = goal_handle.request.trajectory
         n = self._kin.num_joints
 
+# condition if the trajectory points are not recieved properly
         if not traj.points:
             self.get_logger().error('Received trajectory with no points.')
             goal_handle.abort()
