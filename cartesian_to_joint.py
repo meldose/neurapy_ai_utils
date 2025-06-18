@@ -189,7 +189,7 @@
 import rclpy  # ROS2 Python client library
 from rclpy.node import Node  # imported Node module  
 from rclpy.executors import MultiThreadedExecutor # imported module  
-from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.action import ActionServer, CancelResponse, GoalResponse # imported 
 from sensor_msgs.msg import JointState # imported the jointstate
 from geometry_msgs.msg import PoseStamped  #imported Posestamed module
 from control_msgs.action import FollowJointTrajectory # imported ros2 action module 
@@ -366,7 +366,13 @@ class MovejointtoJointActionServer(Node):
         """Accept all cancel requests."""
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
+    
 
+    def cancel_callback(self,goal_handle) -> CancelResponse:
+
+        self.get_logger().info("Cancel request recieved")
+        return CancelResponse.ACCEPT
+    
     def execute_callback(
         self,
         goal_handle
@@ -420,15 +426,15 @@ class MovejointtoJointActionServer(Node):
 # main function 
 def main(args=None):
 
-    rclpy.init(args=args)
-    node = MovejointtoJointActionServer()
+    rclpy.init(args=args) # initialise the node
+    node = MovejointtoJointActionServer() # setting up the server
     try:
-        rclpy.spin(node)
+        rclpy.spin(node) # spin the node 
     except KeyboardInterrupt:
         node.get_logger().info('Shutting down')
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        node.destroy_node() # destroy the node 
+        rclpy.shutdown() # killing the node
 
 # calling the main function
 if __name__ == '__main__':
