@@ -11,8 +11,10 @@ from typing import List, Optional
 
 from neurapy.robot import Robot
 
-
+# class for Mairakinematics
 class MairaKinematics(Node):
+
+# intialise the values 
     def __init__(
         self,
         joint_names_param: List[str],
@@ -52,20 +54,25 @@ class MairaKinematics(Node):
         self._robot = Robot()
         self._logger.info("[MairaKinematics]: initialization complete.")
 
+# defining the function for getting the current joint state
     def _get_current_joint_state(self) -> List[float]:
         return self._robot.get_current_joint_angles()
 
+# defining function to get the current cartesain pose
     def _get_current_cartesian_pose(self) -> List[float]:
         return self._robot.get_current_cartesian_pose()
 
+# function to check if the pose is invalid or not
     def _throw_if_pose_invalid(self, pose: List[float]) -> None:
         if not (isinstance(pose, list) and len(pose) == 6):
             raise TypeError("[ERROR] goal_pose should be a list of 6 floats [x,y,z,rx,ry,rz]")
 
+# function to throw if the list of the poses are invalid or not 
     def _throw_if_list_poses_invalid(self, poses: List[List[float]]) -> None:
         if not (isinstance(poses, list) and all(isinstance(p, list) and len(p) == 6 for p in poses)):
             raise TypeError("[ERROR] goal_poses should be a list of 6-element lists")
 
+# function to wait for motion to finish
     def wait_motion_finish(
         self,
         target: List[float],
@@ -83,7 +90,7 @@ class MairaKinematics(Node):
             time.sleep(period)
         return False
 
-
+# function to move linearlly
     def move_linear(
         self,
         goal_pose: List[float],
