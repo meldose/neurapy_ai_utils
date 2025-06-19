@@ -3,7 +3,8 @@ from rclpy.node import Node
 from rclpy.action import ActionServer
 from control_msgs.action import FollowJointTrajectory
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
+from geometry_msgs.msg import PoseStamped
+from tf_transformations import quaternion_from_euler
 import time
 import traceback
 from typing import List, Optional
@@ -82,6 +83,7 @@ class MairaKinematics(Node):
             time.sleep(period)
         return False
 
+
     def move_linear(
         self,
         goal_pose: List[float],
@@ -90,12 +92,9 @@ class MairaKinematics(Node):
         rot_speed: Optional[float] = None,
         rot_acc: Optional[float] = None,
     ) -> bool:
-        """Execute a Cartesian linear move to the specified pose."""
         self._throw_if_pose_invalid(goal_pose)
-
         self.id_manager += 1
         motion_id = self.id_manager
-
         props = {
             "target_pose": goal_pose,
             "speed": self.speed_move_linear if speed is None else speed,
@@ -104,15 +103,14 @@ class MairaKinematics(Node):
             "rotational_acceleration": self.rot_acc_move_linear if rot_acc is None else rot_acc,
             "blend_radius": 0.0,
         }
-
         try:
-            # Use the robot’s Cartesian move API
             self._robot.move_linear(**props, motion_id=motion_id)
             return self.wait_motion_finish(target=goal_pose)
         except Exception:
             self._logger.error(traceback.format_exc())
             return False
 
+# function for move linear through points
     def move_linear_via_points(
         self,
         goal_poses: List[List[float]],
@@ -122,7 +120,6 @@ class MairaKinematics(Node):
         rot_acc: Optional[float] = None,
         blending_radius: Optional[float] = None,
     ) -> bool:
-        """Execute a Cartesian linear move through multiple poses."""
         self._throw_if_list_poses_invalid(goal_poses)
         self.id_manager += 1
         motion_id = self.id_manager
@@ -136,7 +133,6 @@ class MairaKinematics(Node):
             "rotational_acceleration": self.rot_acc_move_linear if rot_acc is None else rot_acc,
             "blend_radius": self.blending_radius if blending_radius is None else blending_radius,
         }
-
         try:
             self._robot.move_linear(**props, motion_id=motion_id)
             return self.wait_motion_finish(target=goal_poses[-1])
@@ -144,14 +140,14 @@ class MairaKinematics(Node):
             self._logger.error(traceback.format_exc())
             return False
 
+# class TestjointTrajectoryServer
 
 class TestJointTrajectoryServer(Node):
-    """ROS2 Action Server that dispatches Cartesian linear moves based on FollowJointTrajectory requests."""
     def __init__(self):
         super().__init__('test_joint_trajectory_server')
         self._logger = self.get_logger()
 
-        # Parameters
+        # Load parameters
         self.declare_parameter('joint_names',
                                ['joint1','joint2','joint3','joint4','joint5','joint6','joint7'])
         self.declare_parameter('action_name', 'follow_joint_trajectory')
@@ -169,68 +165,70 @@ class TestJointTrajectoryServer(Node):
             self._execute_callback
         )
 
-        # Joint state publisher at 50Hz
-        self._state_pub = self.create_publisher(JointState, '/internal_kin_joint_states', 10)
-        self.create_timer(0.02, self._publish_joint_states)
+        # Publisher for current Cartesian TCP pose
+        self._pose_pub = self.create_publisher(PoseStamped, '/current_pose', 10)
 
-        self._logger.info("Simple Joint Trajectory Action Server initialized.")
+        # Subscriber to joint states, to compute & publish Cartesian
+        self._waypoints: List[List[float]] = []
 
+# subscriber and Publisher
+
+        self._joint_state_sub = self.create_subscription(
+            JointState, '/joint_states', self.joint_state, 10)
+
+        self._latest_state: Optional[JointState] = None
+        self._logger.info("TestJointTrajectoryServer initialized.")
+
+    def joint_state(self, msg: JointState):
+        """Convert each JointState → Cartesian TCP pose; publish & record it."""
+        self._latest_state = msg
+
+        try:
+            cart = self._maira_kin._get_current_cartesian_pose()
+        except Exception as e:
+            self._logger.error(f"Failed to get Cartesian pose: {e}")
+            return
+
+        ps = PoseStamped()
+        ps.header.stamp = self.get_clock().now().to_msg()
+        ps.header.frame_id = 'base_link'
+        ps.pose.position.x, ps.pose.position.y, ps.pose.position.z = cart[0], cart[1], cart[2]
+        qx, qy, qz, qw = quaternion_from_euler(cart[3], cart[4], cart[5])
+        ps.pose.orientation.x = qx
+        ps.pose.orientation.y = qy
+        ps.pose.orientation.z = qz
+        ps.pose.orientation.w = qw
+
+        # publish current Cartesian pose
+        self._pose_pub.publish(ps)
+        # record for later replay
+        self._waypoints.append(cart)
+
+# callback function 
     def _execute_callback(self, goal_handle):
-        self._logger.info('Received trajectory goal.')
-        traj = goal_handle.request.trajectory
-
-        # Validate
-        if not traj.points:
-            self._logger.error('Empty trajectory')
-            goal_handle.abort()
-            return FollowJointTrajectory.Result()
-
-        if len(traj.joint_names) != self._maira_kin.num_joints:
-            self._logger.error('Joint count mismatch')
-            goal_handle.abort()
-            return FollowJointTrajectory.Result()
-
-        # Convert to list-of-lists
-        poses = [list(p.positions) for p in traj.points]
-
-        # Dispatch to linear motion
+        self._logger.info('Replaying recorded Cartesian path...')
+        # Call Cartesian linear via recorded waypoints
+        success = False
         try:
-            if len(poses) == 1:
-                success = self._maira_kin.move_linear(poses[0])
-            else:
-                success = self._maira_kin.move_linear_via_points(poses)
-
-            result = FollowJointTrajectory.Result()
-            if success:
-                self._logger.info('Motion succeeded')
-                result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
-                goal_handle.succeed()
-            else:
-                self._logger.error('Motion failed')
-                result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-                goal_handle.abort()
-            return result
-
+            success = self._maira_kin.move_linear_via_points(self._waypoints)
         except Exception:
             self._logger.error(traceback.format_exc())
-            goal_handle.abort()
-            res = FollowJointTrajectory.Result()
-            res.error_code = FollowJointTrajectory.Result.INVALID_GOAL
-            return res
 
-    def _publish_joint_states(self):
-        try:
-            positions = self._maira_kin._get_current_joint_state()
-            msg = JointState()
-            msg.header = Header()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.name = self._maira_kin._joint_names
-            msg.position = positions
-            msg.velocity = [0.0] * len(positions)
-            msg.effort = [0.0] * len(positions)
-            self._state_pub.publish(msg)
-        except Exception:
-            self._logger.error(traceback.format_exc())
+        result = FollowJointTrajectory.Result()
+        if success:
+            self._logger.info('Motion replay succeeded')
+            result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+            goal_handle.succeed()
+        else:
+            self._logger.error('Motion replay failed')
+            result.error_code = FollowJointTrajectory.Result.INVALID_GOAL
+            goal_handle.abort()
+
+        # clear for next run
+        self._waypoints = []
+        return result
+
+# function to destroy the node 
 
     def destroy_node(self):
         self._logger.info('Shutting down server')
@@ -238,7 +236,7 @@ class TestJointTrajectoryServer(Node):
             self._maira_kin.finish()
         super().destroy_node()
 
-
+# main function 
 def main(args=None):
     rclpy.init(args=args)
     server = TestJointTrajectoryServer()
@@ -250,6 +248,6 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
 
-
+# calling the main function 
 if __name__ == '__main__':
     main()
