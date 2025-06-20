@@ -369,6 +369,8 @@ class SimpleJointTrajectoryServer(Node):
 
 
 
+# added new function 
+
     def move_linear(
         self,
         goal_pose: List[float],
@@ -594,3 +596,9 @@ def main(args=None):
 
 if __name__ == '__main__':
     main() 
+
+
+
+
+
+
