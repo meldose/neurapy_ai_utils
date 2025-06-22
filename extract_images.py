@@ -21,7 +21,7 @@ class ImageExtractor:
         rospy.loginfo("Image extractor started. Waiting for image messages...")
         rospy.spin()
 
-    def image_callback(self, msg):
+    def image_callback(self, msg: Image):
         try:
             # Convert the ROS image to OpenCV format (BGR8)
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
