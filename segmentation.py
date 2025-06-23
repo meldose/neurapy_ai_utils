@@ -30,7 +30,7 @@ class InstanceSegNode:
         
     
 # creating fucntion for callback 
-    def callback(self,msg):
+    def callback(self,msg:Image):
         
         try:
             cv_image=self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
