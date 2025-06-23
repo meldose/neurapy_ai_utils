@@ -1,9 +1,10 @@
-from rosbags.highlevel import AnyReader
-from pathlib import Path
-import cv2
+from rosbags.highlevel import AnyReader # imported rosbags modules
+from pathlib import Path # imported the path
+import cv2 # imported the cv2 module 
 from rosbags.image import message_to_cvimage
 
 
+# function for getting the images
 def get_images(bagdir, outdir):
     outdir = Path(outdir)
     if not outdir.exists():
@@ -24,7 +25,7 @@ def get_images(bagdir, outdir):
                 count += 1
 
 
-bagdir = "/home/alina.kloss/Downloads/rosbag2_2025_06_22-17_38_27"
-out_dir = "/home/alina.kloss/Desktop/annotation_data/maira2"
+bagdir = "/home/midhun.eldose/Downloads/rosbag2_2025_06_22-17_37_00" # directory for the ros2bag
+out_dir = "/home/midhun.eldose/Desktop/" # directory for the output
 
-get_images(bagdir, out_dir)
+get_images(bagdir, out_dir) # calling tehe function 
