@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 import rospy # imported rospy
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-import cv2
-import os
+from sensor_msgs.msg import Image # imported sensor msg
+from cv_bridge import CvBridge # importing cv_bridge
+import cv2 # importing cv2
+import os # importing os
 
+
+# creating class
 class ImageExtractor:
     def __init__(self):
         rospy.init_node('image_extractor_node', anonymous=True)
@@ -21,6 +23,7 @@ class ImageExtractor:
         rospy.loginfo("Image extractor started. Waiting for image messages...")
         rospy.spin()
 
+# function for saving the images
     def image_callback(self, msg: Image):
         try:
             # Convert the ROS image to OpenCV format (BGR8)
@@ -32,8 +35,11 @@ class ImageExtractor:
         except Exception as e:
             rospy.logerr(f"Image conversion failed: {e}")
 
+
+# calling main function
 if __name__ == '__main__':
     try:
-        extractor = ImageExtractor()
-    except rospy.ROSInterruptException:
+        extractor = ImageExtractor() # creating object
+        rospy.spin(extractor)
+    except KeyboardInterrupt("Shutting down"):
         pass
