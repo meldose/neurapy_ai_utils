@@ -26,11 +26,11 @@ class InstanceSegNode:
         
         self.pub=rospy.Publisher("/instance_segementation",Image,queue_size=1) # creating publisher 
         
-        rospy.loginfo("Instance segmentation node started")
+        rospy.loginfo("Instance segmentation node started and has subscribed to /camera/image_raw")
         
     
 # creating fucntion for callback 
-    def callback(self,msg:Image):
+    def callback(self,msg):
         
         try:
             cv_image=self.bridge.imgmsg_to_cv2(msg,desired_encoding="bgr8")
