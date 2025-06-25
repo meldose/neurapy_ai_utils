@@ -8,6 +8,8 @@ from trajectory_msgs.msg import JointTrajectoryPoint  # imported JointTrajectory
 from std_msgs.msg import Header # imported Header module 
 import time # imported time module 
 from typing import List, Optional # imported List, Optional ,Tuple module 
+import traceback
+from geometry_msgs.msg import Pose,PoseStamped
 
 #from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 from neurapy_ai_utils.functions.utils import init_logger
