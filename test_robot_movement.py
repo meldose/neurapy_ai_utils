@@ -1,10 +1,10 @@
-from neurapy_ai.clients.database_client import DatabaseClient # importing the database client from neurapy.clients
+from neurapy_ai.clients.database_client import DatabaseClient
 
-from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics # importing the kinematics from neurapy.utils
+from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
 
 
 # defining the database client 
-db_client = DatabaseClient() 
+db_client = DatabaseClient()
 robot = MairaKinematics(require_elbow_up=False)
 
 # setting up the points
@@ -42,7 +42,19 @@ robot.move_linear(point_1) # moving the robot to the point1
 robot.move_linear(point_2) # moving the robot to the point2
 robot.move_linear(point_3) # moving the robot to the point3
 
-robot.move_linear_via_points([point_1, point_2, point_3], blending_radius=0.1) # moving to move_linear_through_points
-robot.move_joint_via_points([joint_poses_1, joint_poses_2, joint_poses_3]) # moving to move_joint_via_points
+robot.move_linear_via_points([point_1, point_2, point_3], blending_radius=0.1)
+robot.move_joint_via_points([joint_poses_1, joint_poses_2, joint_poses_3])
 
-robot.finish() # stopping the robot movement
+robot.finish()
+
+
+robot.move_linear(point_1)
+robot.move_linear(point_2)
+robot.move_linear(point_3)
+
+robot.move_linear_via_points([point_1,point_2,point_3],blending_radius=0.1)
+
+robot.move_joint_via_points([joint_poses_1,joint_poses_2,joint_poses_3])
+
+robot.finish()
+
