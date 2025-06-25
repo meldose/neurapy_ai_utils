@@ -1,15 +1,22 @@
-import rclpy
-from rclpy.node import Node
-from rclpy.action import ActionServer
-from control_msgs.action import FollowJointTrajectory
-from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped
-from tf_transformations import quaternion_from_euler
-import time
-import traceback
-from typing import List, Optional
 
-from neurapy.robot import Robot
+import rclpy  # imported rclpy module 
+from rclpy.node import Node # imported Node module 
+from rclpy.action import ActionServer # imported Actionserver module 
+from control_msgs.action import FollowJointTrajectory # imported FollowJointTrajecotry module 
+from sensor_msgs.msg import JointState # imported Joinstate module 
+from trajectory_msgs.msg import JointTrajectoryPoint  # imported JointTrajectoryPoint module 
+from std_msgs.msg import Header # imported Header module 
+import time # imported time module 
+from typing import List, Optional # imported List, Optional ,Tuple module 
+
+#from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
+from neurapy_ai_utils.functions.utils import init_logger
+
+import sys #imported sys 
+sys.path.append("/home/neura/neurapy_alpha/")
+import neurapy # imported neurapy 
+
+from neurapy.robot import Robot # importing the neurayp modules
 
 # class for Mairakinematics
 class MairaKinematics(Node):
@@ -214,12 +221,29 @@ class TestJointTrajectoryServer(Node):
 # callback function 
     def _execute_callback(self, goal_handle):
         self._logger.info('Replaying recorded Cartesian path...')
-        # Call Cartesian linear via recorded waypoints
         success = False
+
         try:
-            success = self._maira_kin.move_linear_via_points(self._waypoints)
+            # if only one pose was recorded, do a straight‐linear move
+            if len(self._waypoints) == 1:
+                target = self._waypoints[0]
+                self._logger.debug(f' → Single‐pose move to {target}')
+                success = self._maira_kin.move_linear(target)
+
+            # if multiple were recorded, do a via‐points move
+            elif len(self._waypoints) > 1:
+                self._logger.debug(f' → Multi‐pose move via {len(self._waypoints)} points')
+                success = self._maira_kin.move_linear_via_points(self._waypoints)
+
+            else:
+                # no waypoints? that’s an error
+                self._logger.error('No waypoints recorded!')
+                success = False
+
         except Exception:
+            self._logger.error('Exception during Cartesian replay:')
             self._logger.error(traceback.format_exc())
+            success = False
 
         result = FollowJointTrajectory.Result()
         if success:
@@ -234,7 +258,6 @@ class TestJointTrajectoryServer(Node):
         # clear for next run
         self._waypoints = []
         return result
-
 # function to destroy the node 
 
     def destroy_node(self):
