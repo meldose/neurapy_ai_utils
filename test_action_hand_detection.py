@@ -17,24 +17,24 @@ if __name__ == "__main__":
 
     robot.move_joint_to_joint(observe_position) # moving robot to the observe position
 
-    return_code, waypoits = hand_detection_client.detect_hand_poses(2) # gets two sets of hand poses
+    return_code, waypoints = hand_detection_client.detect_hand_poses(2) # gets two sets of hand poses
     
     # if the return code is not success
-    if return_code != ReturnCodes.SUCCESS or len(waypoits) == 0:
+    if return_code != ReturnCodes.SUCCESS or len(waypoints) == 0:
         print("Something went bad")
         exit(0)
 
-    print(waypoits)
+    print(waypoints)
 
     edge_detection_client = EdgeRefinerClient() # setting up the EdgeRefinerClient 
     [
         return_code,
         point_begining,
         point_end,
-    ] = edge_detection_client.refine_line(waypoits[0], waypoits[1], False)
+    ] = edge_detection_client.refine_line(waypoints[0], waypoints[1], False)
 
 # if the return code is not success
-    if return_code != ReturnCodes.SUCCESS or len(waypoits) == 0:
+    if return_code != ReturnCodes.SUCCESS or len(waypoints) == 0:
         print("Something went bad") # not success
         exit(0) # exit the window 
     print(point_begining) 
