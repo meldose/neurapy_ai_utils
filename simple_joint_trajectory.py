@@ -599,31 +599,3 @@ if __name__ == '__main__':
         if hasattr(self._maira_kin, 'finish'):
             self._maira_kin.finish()
         super().destroy_node()
-
-def main(args=None):
-    """Main function to run the simple joint trajectory action server."""
-    rclpy.init(args=args)
-    
-    try:
-        # Create and run the action server
-        action_server = SimpleJointTrajectoryServer()
-        
-        try:
-            rclpy.spin(action_server)
-        finally:
-            action_server.destroy_node()
-            
-    except KeyboardInterrupt:
-        pass
-    finally:
-        rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main() 
-
-
-
-
-
-
