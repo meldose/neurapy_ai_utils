@@ -1,11 +1,11 @@
-import rospy
+import rospy # importing the rospy module
 from neurapy_ai.clients.marker_detection_client import MarkerDetectionClient
-from neurapy_ai.return_codes import ReturnCodes
+from neurapy_ai.return_codes import ReturnCodes # importing the ReturnCodes
 
-from neurapy_ai_utils.grippers.gripper_interface import DummyGripper
-from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics
+from neurapy_ai_utils.grippers.gripper_interface import DummyGripper # importing the DummyGripper
+from neurapy_ai_utils.robot.maira_kinematics import MairaKinematics # importing the MairaKinematics
 # from neurapy_ai_utils.robot.moveit_kinematics import MoveitKinematics
-from neurapy_ai_utils.robot.robot import Robot
+from neurapy_ai_utils.robot.robot import Robot # importig the Robot
 
 # calling the main function
 
@@ -14,10 +14,10 @@ if __name__ == "__main__":
     rospy.init_node("application_run") # initalise the node 
     # robot = Robot(MoveitKinematics(), DummyGripper())
     robot = Robot(MairaKinematics(), DummyGripper())
-    observe_position = [0, 0, 0, 1.5, -1.5, 0, 0]
-    drop_position = observe_position
+    target_position = [0, 0, 0, 1.5, -1.5, 0, 0] # setting up the observe position
+    drop_position = target_position
 
-    robot.move_joint_to_joint(observe_position) # moviong the robot to the specified postion
+    robot.move_joint_to_joint(target_position) # moviong the robot to the specified postion
     return_code, tags, ids = marker_detection_client.getMarkers(10)
 
     if return_code != ReturnCodes.SUCCESS or len(tags) == 0:
