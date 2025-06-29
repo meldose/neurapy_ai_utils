@@ -1,9 +1,9 @@
-from setuptools import setup, find_packages
-from pathlib import Path
+from setuptools import setup, find_packages # imported the setup module
+from pathlib import Path # imported the path
 
 # Read the long description from README.md
-this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+this_directory = Path(__file__).parent # setting up the path
+long_description = (this_directory / "README.md").read_text() # read the text
 
 setup(
     name="neurapy_ai_utils",
